@@ -1,18 +1,1 @@
-{
-  "hooks": {
-    "SessionStart": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash .claude/scripts/check-version.sh"
-          },
-          {
-            "type": "command",
-            "command": "node .agents/scripts/ping.mjs sessao"
-          }
-        ]
-      }
-    ]
-  }
-}
+{}
