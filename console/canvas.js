@@ -31,12 +31,23 @@ import {
   readableViewportPlan,
 } from './canvas-layout-policy.js';
 
-const KIND_ACCENT = {
-  source: '#4fd1c5', area: '#67a7ff', system: '#9b8cff', routine: '#5e7ce2',
-  collector: '#5eead4', retrieval: '#4da3ff', skill: '#d98cff', capability: '#9b8cff',
-  stage: '#78a9ff', artifact: '#e2e8f0', output: '#e2e8f0', gate: '#f6bd4a', judgment: '#f6bd4a',
-  run: '#42d392', handoff: '#59d6ff', model: '#d98cff', connector: '#5eead4',
+// As cores vêm dos tokens do styles.css, lidas na montagem do canvas, para
+// acompanhar o tema claro/escuro sem duplicar paleta aqui.
+function token(name) {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+}
+
+const KIND_TOKEN = {
+  source: '--kind-source', area: '--kind-area', system: '--kind-system', routine: '--kind-routine',
+  collector: '--kind-source', retrieval: '--kind-area', skill: '--kind-skill', capability: '--kind-system',
+  stage: '--kind-area', artifact: '--kind-artifact', output: '--kind-artifact', gate: '--kind-gate', judgment: '--kind-gate',
+  run: '--kind-run', handoff: '--run', model: '--kind-skill', connector: '--kind-source',
 };
+
+function kindAccent(kind) {
+  return KIND_TOKEN[kind] ? token(KIND_TOKEN[kind]) : token('--text-3');
+}
+
 
 const KIND_LABEL = {
   source: 'Fonte',
@@ -109,21 +120,21 @@ function sourceIcon(node) {
   if (ref.includes('clickup')) return simpleIconDataUri(siClickup);
   if (ref.includes('drive')) return simpleIconDataUri(siGoogledrive);
   if (ref.includes('fathom')) return simpleIconDataUri(siFathom);
-  if (ref.includes('github') || ref.includes('git-repository')) return simpleIconDataUri(siGithub, '#f3f7fb');
+  if (ref.includes('github') || ref.includes('git-repository')) return simpleIconDataUri(siGithub, token('--text'));
   if (ref.includes('meta-marketing')) return simpleIconDataUri(siMeta);
   if (ref.includes('supabase')) return simpleIconDataUri(siSupabase);
   if (ref.includes('whatsapp')) return simpleIconDataUri(siWhatsapp);
-  if (ref.includes('funnel') || ref.includes('experiment')) return functionalIconDataUri(FileChartColumn, '#8cc8ff');
-  if (ref.includes('platform')) return functionalIconDataUri(AppWindow, '#8cc8ff');
-  if (ref.includes('social')) return functionalIconDataUri(Share2, '#8cc8ff');
-  if (ref.includes('vault') || ref.includes('knowledge')) return functionalIconDataUri(BookOpenText, '#8cc8ff');
-  if (ref.includes('video') || ref.includes('vturb')) return functionalIconDataUri(Video, '#8cc8ff');
-  return functionalIconDataUri(BookOpenText, '#8cc8ff');
+  if (ref.includes('funnel') || ref.includes('experiment')) return functionalIconDataUri(FileChartColumn, token('--kind-area'));
+  if (ref.includes('platform')) return functionalIconDataUri(AppWindow, token('--kind-area'));
+  if (ref.includes('social')) return functionalIconDataUri(Share2, token('--kind-area'));
+  if (ref.includes('vault') || ref.includes('knowledge')) return functionalIconDataUri(BookOpenText, token('--kind-area'));
+  if (ref.includes('video') || ref.includes('vturb')) return functionalIconDataUri(Video, token('--kind-area'));
+  return functionalIconDataUri(BookOpenText, token('--kind-area'));
 }
 
 function nodeIcon(node) {
   if (node.kind === 'source') return sourceIcon(node);
-  return functionalIconDataUri(KIND_ICON[node.kind] || Boxes, KIND_ACCENT[node.kind] || '#91a0b5');
+  return functionalIconDataUri(KIND_ICON[node.kind] || Boxes, kindAccent(node.kind));
 }
 
 function nodeType() {
@@ -272,7 +283,7 @@ export async function mountOperationalCanvas({
   const graph = new Graph({
     container,
     data,
-    background: '#070708',
+    background: token('--bg'),
     padding: model.graph_type === 'brain' ? [72, 340, 72, 48] : [32, 340, 32, 32],
     autoFit: false,
     animation: { duration: 220, easing: 'ease-out' },
@@ -305,7 +316,7 @@ export async function mountOperationalCanvas({
     edge: {
       type: model.graph_type === 'brain' ? 'line' : 'cubic-horizontal',
       style: {
-        stroke: (datum) => datum.data.actual ? '#4e9cf5' : '#9fb3cf',
+        stroke: (datum) => datum.data.actual ? token('--run') : token('--text-3'),
         lineWidth: (datum) => datum.data.actual ? 1.8 : 1,
         opacity: (datum) => datum.data.actual ? 0.9 : model.graph_type === 'brain' ? 0.3 : 0.38,
         lineDash: (datum) => datum.data.actual ? [7, 4] : model.graph_type === 'brain' ? [1, 0] : [2, 6],
@@ -313,9 +324,9 @@ export async function mountOperationalCanvas({
         cursor: 'pointer',
       },
       state: {
-        actual: { stroke: '#4e9cf5', lineWidth: 1.8, opacity: 0.85 },
-        selected: { stroke: '#f4f4f5', lineWidth: 2, opacity: 0.9 },
-        neighbor: { stroke: '#7ab5f8', lineWidth: 1.5, opacity: 0.66 },
+        actual: { stroke: token('--run'), lineWidth: 1.8, opacity: 0.85 },
+        selected: { stroke: token('--text'), lineWidth: 2, opacity: 0.9 },
+        neighbor: { stroke: token('--run'), lineWidth: 1.5, opacity: 0.66 },
         inactive: { opacity: 0.05 },
       },
       animation: { enter: false, update: 'fade' },
@@ -423,6 +434,6 @@ export async function mountOperationalCanvas({
     },
     positions: () => allPositions(graph),
     destroy: () => graph.destroy(),
-    accentFor: (kind) => KIND_ACCENT[kind] || '#91a0b5',
+    accentFor: (kind) => kindAccent(kind),
   };
 }

@@ -13,7 +13,7 @@ const recoveryAsset = between('function renderOverviewRecoveryAsset', 'function 
 const activity = between('function renderOverviewActivity', 'function renderBrainOverview');
 const overview = between('function renderBrainOverview', 'function renderBrainMemory');
 
-assert.match(overview, /SEU CÉREBRO HOJE/, 'a visão geral deve começar pela vida da empresa');
+assert.match(overview, /Seu Cérebro hoje/, 'a visão geral deve começar pela vida da empresa');
 assert.match(overview, /Contexto que já consegue voltar para o trabalho/, 'a promessa deve falar de uso');
 assert.match(overview, /Realidade entrando/, 'Fontes observadas devem aparecer como fato vivido');
 assert.match(overview, /Trabalho sustentado/, 'integridade dos Runs deve aparecer sem score composto');
@@ -39,10 +39,10 @@ const detailsAt = overview.indexOf('brain-capability-details');
 assert(heroAt >= 0 && heroAt < supportedAt && supportedAt < activityAt && activityAt < detailsAt,
   'a hierarquia deve ser estado, capacidades, atividade/cuidado e anatomia recolhida');
 
-assert.match(overview, /O QUE ELE JÁ SUSTENTA/, 'a prova curta deve ser traduzida para capacidade');
-assert.match(activity, /ATIVIDADE OBSERVADA/, 'atividade precisa ser nomeada sem alegar causalidade');
+assert.match(overview, /O que ele já sustenta/, 'a prova curta deve ser traduzida para capacidade');
+assert.match(activity, /Atividade observada/, 'atividade precisa ser nomeada sem alegar causalidade');
 assert.match(activity, /O que aconteceu por último/, 'a atividade deve orientar sem inventar mudança');
-assert.match(overview, /PEDE ATENÇÃO/, 'sinais de cuidado precisam continuar visíveis');
+assert.match(overview, /Pede atenção/, 'sinais de cuidado precisam continuar visíveis');
 assert.match(overview, /<details class="brain-capability-details">/, 'a anatomia técnica deve nascer recolhida');
 assert.match(overview, /Como este Cérebro funciona/, 'a divulgação progressiva precisa ser explícita');
 assert.doesNotMatch(overview, /systems_readiness|Sistemas prontos/, 'prontidão de Sistemas ainda não é medida');

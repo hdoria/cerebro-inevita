@@ -18,7 +18,7 @@ assert.match(today, /routines\.slice\(0, 4\)/, 'Hoje deve limitar a primeira fil
 assert.match(today, /<details class="today-more">/, 'a cauda de Hoje deve começar recolhida');
 
 assert.match(capabilities, /você não precisa rodar um comando/, 'capacidade nativa deve explicar o uso automático');
-assert.match(capabilities, /ESTADO NESTE CÉREBRO/, 'visão geral deve mostrar apenas uma prova curta');
+assert.match(capabilities, /Estado neste Cérebro/, 'visão geral deve mostrar apenas uma prova curta');
 assert.doesNotMatch(capabilities, /capability\.proof\.detail/, 'prova técnica detalhada não pertence à primeira camada');
 assert.doesNotMatch(capabilities, /capability\.skills/, 'Skills não devem lotar o resumo de capacidades');
 assert.match(css, /\.native-capability-card \{[^}]*grid-template-columns: 130px/, 'capacidades devem formar sequência compacta');
@@ -29,9 +29,9 @@ assert.match(app, /const weight = \{ active: 0, configured: 1, mapped: 2 \}/, 'S
 
 assert.match(app, /\['overview', 'Sobre'\]/, 'primeira aba do Sistema deve se apresentar como Sobre');
 assert(workspace.indexOf('Para que este sistema existe') < workspace.indexOf('${wsMetrics(ws)}'), 'promessa deve aparecer antes das métricas');
-assert.match(workspace, /EVIDÊNCIA OPERACIONAL/, 'métricas devem manter uma seção própria');
+assert.match(workspace, /Evidência operacional/, 'métricas devem manter uma seção própria');
 
-assert.match(skills, /COMANDOS ESPECIALIZADOS/, 'Skills devem ser explicadas em linguagem de uso');
+assert.match(skills, /Comandos especializados/, 'Skills devem ser explicadas em linguagem de uso');
 assert.doesNotMatch(skills, /\.claude\/skills/, 'caminhos técnicos não devem aparecer na primeira camada');
 assert.match(css, /\.skill-card \{[^}]*min-height: 220px/, 'cards de Skills devem ser compactos');
 assert.match(css, /\.skill-description \{[^}]*-webkit-line-clamp: 2/, 'descrição de Skill deve limitar-se a duas linhas');

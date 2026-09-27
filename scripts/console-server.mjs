@@ -1194,6 +1194,8 @@ const COOKIE_NAME = 'cerebro_console_session';
 const MAX_BODY_BYTES = 32 * 1024;
 const ENGINE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const STATIC_ROOT = resolve(ENGINE_ROOT, 'console');
+// Lista fechada: o caminho da URL nunca vira caminho de disco.
+const CONSOLE_FONTS = new Set(['/fonts/Geist-Variable.woff2', '/fonts/GeistMono-Variable.woff2']);
 const SAFE_ACTOR_RE = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/;
 const SAFE_REF_RE = /^[A-Za-z0-9][A-Za-z0-9_./:-]{0,255}$/;
 
@@ -1384,6 +1386,10 @@ export function createConsoleServer({
       }
       if (request.method === 'GET' && url.pathname === '/styles.css') {
         sendStatic(response, 'styles.css', 'text/css; charset=utf-8');
+        return;
+      }
+      if (request.method === 'GET' && CONSOLE_FONTS.has(url.pathname)) {
+        sendStatic(response, url.pathname.slice(1), 'font/woff2');
         return;
       }
       if (request.method === 'GET' && url.pathname === '/favicon.ico') {

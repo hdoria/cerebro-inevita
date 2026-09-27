@@ -290,7 +290,7 @@ function renderActivation() {
       </div>
       <div class="first-mission-promise" aria-label="O que esta missão prova">
         <span class="first-mission-mark" aria-hidden="true"><i></i><i></i><i></i></span>
-        <p class="micro">O QUE VAI FICAR PRONTO</p>
+        <p class="micro">O que vai ficar pronto</p>
         <strong>Um resultado que você usaria.</strong>
         <p>Depois, o mesmo contexto volta para uma segunda tarefa sem você precisar explicar tudo outra vez.</p>
         <div><span>Cérebro</span><i>prepara contexto</i><span>Sistema</span><i>produz resultado</i></div>
@@ -303,12 +303,12 @@ function renderActivation() {
     </section>` : ''}
 
     <section class="first-mission-source">
-      <div><p class="micro">E SE EU NÃO TIVER FONTE CONECTADA?</p><h3>Nenhuma integração é necessária para começar.</h3><p>A fonte-semente é só o menor pedaço de realidade capaz de sustentar o primeiro trabalho.</p></div>
+      <div><p class="micro">E se eu não tiver Fonte conectada?</p><h3>Nenhuma integração é necessária para começar.</h3><p>A fonte-semente é só o menor pedaço de realidade capaz de sustentar o primeiro trabalho.</p></div>
       <ul>${activation.seed_options.map((option) => `<li><i></i>${escapeHtml(option)}</li>`).join('')}</ul>
     </section>
 
     <section class="first-mission-progress">
-      <header><div><p class="micro">ATIVAÇÃO POR USO</p><h3>${activation.completed_steps} de ${activation.total_steps} passos observados</h3></div><span>${progress}%</span></header>
+      <header><div><p class="micro">Ativação por uso</p><h3>${activation.completed_steps} de ${activation.total_steps} passos observados</h3></div><span>${progress}%</span></header>
       <progress max="100" value="${progress}">${progress}%</progress>
       <ol>${activation.steps.map((step, index) => {
         const stepState = step.completed_at ? 'complete' : step.id === activation.current_step ? 'current' : 'pending';
@@ -384,14 +384,14 @@ function renderCompatibility() {
   return `<div class="compat-page">
     <section class="compat-hero">
       <div class="compat-score"><strong>${diagnostic.score.percent}</strong><span>% compatível</span></div>
-      <div><p class="eyebrow">COMPATIBILITY DOCTOR · READ-ONLY</p><h2>${escapeHtml(label(diagnostic.target.classification))}</h2><p>Estágio ${escapeHtml(label(diagnostic.target.activation_stage))} · ${escapeHtml(profile)}</p><progress max="${diagnostic.score.applicable}" value="${diagnostic.score.met}">${diagnostic.score.percent}%</progress></div>
+      <div><p class="eyebrow">Compatibility doctor · Read-only</p><h2>${escapeHtml(label(diagnostic.target.classification))}</h2><p>Estágio ${escapeHtml(label(diagnostic.target.activation_stage))} · ${escapeHtml(profile)}</p><progress max="${diagnostic.score.applicable}" value="${diagnostic.score.met}">${diagnostic.score.percent}%</progress></div>
       <div class="compat-guarantee"><span>Não abriu conteúdo</span><span>Não conectou Fonte</span><span>Não migrou nada</span></div>
     </section>
-    <div class="section-heading"><div><p class="eyebrow">9 CONTRATOS DE COMPATIBILIDADE</p><h2>O que existe de verdade</h2></div><p>Presença técnica é declaração. Só Run e recibo válido contam como observado.</p></div>
+    <div class="section-heading"><div><p class="eyebrow">9 Contratos de compatibilidade</p><h2>O que existe de verdade</h2></div><p>Presença técnica é declaração. Só Run e recibo válido contam como observado.</p></div>
     <div class="compat-grid">${checks}</div>
     <div class="compat-lower-grid">
-      <section class="compat-panel"><div class="section-heading"><div><p class="eyebrow">SYSTEM READINESS</p><h2>Sistemas instalados</h2></div></div><div class="readiness-group"><h3>Prontos pelo protocolo</h3><ul>${ready || '<li><span>Nenhum Sistema pronto ainda.</span></li>'}</ul></div><div class="readiness-group blocked"><h3>Bloqueados honestamente</h3><ul>${blocked || '<li><span>Nenhum bloqueio protocolar.</span></li>'}</ul></div></section>
-      <section class="compat-panel"><div class="section-heading"><div><p class="eyebrow">PLANO SEM DESTRUIÇÃO</p><h2>Preservar, adaptar e adicionar</h2></div></div><div class="migration-plan"><article><span>Preservar</span>${diagnosticList(diagnostic.recommendations.preserve, 'Nenhuma evidência canônica ainda.', { limit: 6, raw: true })}</article><article><span>Adaptar</span>${diagnosticList(diagnostic.recommendations.adapt, 'Nada precisa ser adaptado.')}</article><article><span>Adicionar</span>${diagnosticList(diagnostic.recommendations.add, 'Fundação protocolar completa.')}</article><article class="do-not-touch"><span>Não tocar</span>${diagnosticList(diagnostic.recommendations.do_not_touch, '')}</article></div></section>
+      <section class="compat-panel"><div class="section-heading"><div><p class="eyebrow">System readiness</p><h2>Sistemas instalados</h2></div></div><div class="readiness-group"><h3>Prontos pelo protocolo</h3><ul>${ready || '<li><span>Nenhum Sistema pronto ainda.</span></li>'}</ul></div><div class="readiness-group blocked"><h3>Bloqueados honestamente</h3><ul>${blocked || '<li><span>Nenhum bloqueio protocolar.</span></li>'}</ul></div></section>
+      <section class="compat-panel"><div class="section-heading"><div><p class="eyebrow">Plano sem destruição</p><h2>Preservar, adaptar e adicionar</h2></div></div><div class="migration-plan"><article><span>Preservar</span>${diagnosticList(diagnostic.recommendations.preserve, 'Nenhuma evidência canônica ainda.', { limit: 6, raw: true })}</article><article><span>Adaptar</span>${diagnosticList(diagnostic.recommendations.adapt, 'Nada precisa ser adaptado.')}</article><article><span>Adicionar</span>${diagnosticList(diagnostic.recommendations.add, 'Fundação protocolar completa.')}</article><article class="do-not-touch"><span>Não tocar</span>${diagnosticList(diagnostic.recommendations.do_not_touch, '')}</article></div></section>
     </div>
     <div class="boundary-note compat-boundary"><b>Diagnóstico não é migração</b>O próximo passo continua sendo preview → diff → confirmação. Este readback não criou outro cérebro, não moveu Fontes e não alterou nenhum contrato.</div>
   </div>`;
@@ -422,7 +422,7 @@ function renderRoutines() {
   const native = routines.filter((routine) => routine.product_kind === 'brain-native');
   const system = routines.filter((routine) => routine.product_kind !== 'brain-native');
   const group = (title, description, items) => items.length ? `<section class="routine-origin-group"><div class="routine-origin-head"><div><p class="micro">${escapeHtml(title)}</p><p>${escapeHtml(description)}</p></div><b>${items.length}</b></div><div class="routine-list">${items.map(routineCard).join('')}</div></section>` : '';
-  return `<div class="section-heading"><div><p class="eyebrow">CONTROL PLANE</p><h2>Todas as rotinas</h2></div><p>Abrir e inspecionar nunca executa modelos. O relógio só liga após replay e aprovação.</p></div>
+  return `<div class="section-heading"><div><p class="eyebrow">Control plane</p><h2>Todas as rotinas</h2></div><p>Abrir e inspecionar nunca executa modelos. O relógio só liga após replay e aprovação.</p></div>
     ${routines.length ? `${group('Nativas do Cérebro', 'Mantêm contexto, saúde, recuperação e aprendizado.', native)}${group('Dos Sistemas', 'Transformam contexto em resultados de negócio.', system)}` : empty('Nenhuma rotina nesta área', 'Crie um Routine Contract para o primeiro trabalho recorrente.')}`;
 }
 
@@ -532,7 +532,7 @@ function wsOverview(ws) {
   const result = ws.contract.result || {};
   const lastRun = ws.records[0];
   return `<div class="ws-stack">
-    <section class="organ system-about"><header class="organ-head"><div><p class="micro">SOBRE O SISTEMA</p><h3>Para que este sistema existe</h3></div></header>
+    <section class="organ system-about"><header class="organ-head"><div><p class="micro">Sobre o Sistema</p><h3>Para que este sistema existe</h3></div></header>
       <p class="organ-answer">${escapeHtml(ws.system.result)} ${prov('declarado')}</p>
       <dl class="ws-dl">
         <div><dt>Dono</dt><dd>${escapeHtml(result.owner || '—')}</dd></div>
@@ -545,7 +545,7 @@ function wsOverview(ws) {
       ${ws.system.next_gate ? `<div class="organ-gaps"><span>Próximo gate: ${escapeHtml(ws.system.next_gate)}</span></div>` : ''}
     </section>
     <details class="ws-technical-summary"><summary><span><b>Saúde dos sete componentes</b><small>Pipeline, rotinas, Skills, interfaces, gates, evals e aprendizado</small></span><i>Ver estado →</i></summary><section class="organ"><header class="organ-head"><div><h3>Os sete componentes</h3><p>estado declarado × evidência observada</p></div></header>${wsMatrix(ws)}</section></details>
-    <section class="ws-evidence"><div class="section-heading"><div><p class="eyebrow">EVIDÊNCIA OPERACIONAL</p><h2>O que já aconteceu de verdade</h2></div><p>Runs, contexto, julgamento e valor permanecem separados da promessa publicada.</p></div>${wsMetrics(ws)}</section>
+    <section class="ws-evidence"><div class="section-heading"><div><p class="eyebrow">Evidência operacional</p><h2>O que já aconteceu de verdade</h2></div><p>Runs, contexto, julgamento e valor permanecem separados da promessa publicada.</p></div>${wsMetrics(ws)}</section>
   </div>`;
 }
 
@@ -608,7 +608,7 @@ function wsHowItWorks(ws) {
   const body = mode === 'installed' ? wsHowInstalled(ws) : wsHowDeclared(ws);
   return `<div class="ws-stack">
     <div class="ws-canvas-head">
-      <div><p class="eyebrow">COMO O SISTEMA FUNCIONA</p><p class="section-help">Arquitetura declarada e instalação observada. Runs e julgamentos vivem em Execuções.</p></div>
+      <div><p class="eyebrow">Como o Sistema funciona</p><p class="section-help">Arquitetura declarada e instalação observada. Runs e julgamentos vivem em Execuções.</p></div>
       <div class="ws-canvas-actions">
         <div class="ws-mode-switch" role="group" aria-label="Leitura de como o Sistema funciona">
           <button type="button" data-ws-how-mode="declared" class="${mode === 'declared' ? 'active' : ''}">Declarado</button>
@@ -815,7 +815,7 @@ function brainPreviewLayout(graph) {
 
 function renderBrainGraphPreview(graph) {
   if (!graph) {
-    return `<section class="brain-map-panel"><div class="brain-section-head"><div><p class="micro">MAPA INTEIRO</p><h2>Como tudo se conecta</h2></div></div><div class="brain-map-loading"><i></i><span>Preparando a visão leve do grafo…</span></div></section>`;
+    return `<section class="brain-map-panel"><div class="brain-section-head"><div><p class="micro">Mapa inteiro</p><h2>Como tudo se conecta</h2></div></div><div class="brain-map-loading"><i></i><span>Preparando a visão leve do grafo…</span></div></section>`;
   }
   const positions = brainPreviewLayout(graph);
   const nodes = (graph.nodes || []).filter((node) => positions.has(node.id));
@@ -837,7 +837,7 @@ function renderBrainGraphPreview(graph) {
     </g>`;
   }).join('');
   return `<section class="brain-map-panel">
-    <div class="brain-section-head"><div><p class="micro">MAPA INTEIRO</p><h2>Como tudo se conecta</h2><p>Áreas organizam. Sistemas trabalham. Fontes continuam sendo as casas de verdade.</p></div><button class="action" type="button" data-open-brain-map>Explorar o mapa →</button></div>
+    <div class="brain-section-head"><div><p class="micro">Mapa inteiro</p><h2>Como tudo se conecta</h2><p>Áreas organizam. Sistemas trabalham. Fontes continuam sendo as casas de verdade.</p></div><button class="action" type="button" data-open-brain-map>Explorar o mapa →</button></div>
     <div class="brain-map-frame">
       <svg class="brain-map-preview" viewBox="0 0 1000 480" role="img" aria-label="${escapeHtml(graph.subtitle || 'Mapa do Cérebro')}">
         <g class="brain-map-edges">${edgeMarkup}</g>
@@ -913,7 +913,7 @@ function renderRetrievalHealth(health) {
 
   return `<section class="brain-retrieval-health${measured ? '' : ' is-unmeasured'}" aria-labelledby="retrieval-health-title">
     <div class="retrieval-quality-score" ${scoreAttrs}>
-      <div class="retrieval-quality-head"><p class="micro">SAÚDE DO CONTEXTO</p><span class="retrieval-live-state"><i class="${operation.current_status === 'healthy' ? 'observed' : ''}"></i>${escapeHtml(retrievalStatusLabel(operation.current_status))}</span></div>
+      <div class="retrieval-quality-head"><p class="micro">Saúde do contexto</p><span class="retrieval-live-state"><i class="${operation.current_status === 'healthy' ? 'observed' : ''}"></i>${escapeHtml(retrievalStatusLabel(operation.current_status))}</span></div>
       <div class="retrieval-quality-value"><strong>${qualityText}</strong><div><h2 id="retrieval-health-title">Qualidade local da recuperação</h2><p>${measured ? `Hit@3 em ${brainCount(quality.cases)} casos auditados` : 'Ainda não existe benchmark auditado para esta instalação'}</p></div></div>
       <progress class="retrieval-quality-track" max="100" value="${measured ? Math.max(0, Math.min(100, quality.percent)) : 0}" aria-label="${measured ? `${quality.percent}% no benchmark Hit@3` : 'Benchmark não medido'}"></progress>
       <div class="retrieval-quality-proof"><span>${quality.false_positive_percent !== null && quality.false_positive_percent !== undefined ? `${new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 1 }).format(quality.false_positive_percent)}% falsos positivos` : 'falso positivo não medido'}</span><span>${escapeHtml(gate)}</span><span>${quality.measured_at ? `medido ${fmtDate(quality.measured_at, false)}` : 'sem data de medição'}</span></div>
@@ -921,9 +921,9 @@ function renderRetrievalHealth(health) {
     </div>
 
     <div class="retrieval-evidence-list" aria-label="Evidências da recuperação">
-      <article><p class="micro">ÍNDICE</p><strong>${index.documents === null || index.documents === undefined ? 'Não observado' : `${brainCount(index.documents)} documentos`}</strong><span>${index.orphans === null || index.orphans === undefined ? 'órfãos não medidos' : `${brainCount(index.orphans)} órfãos`} · ${index.updated_at ? `geração ${fmtDate(index.updated_at, false)}` : 'sem geração auditada'}</span></article>
-      <article><p class="micro">OPERAÇÃO REAL</p><strong>${brainCount(accepted)} recuperações aceitas</strong><span>${brainCount(abstained)} abstiveram por evidência insuficiente · ${brainCount(unavailable)} falharam no histórico</span></article>
-      <article><p class="micro">CONTEXT SNAPSHOTS</p><strong>${brainCount(snapshots.complete)}/${brainCount(snapshots.observed)} completos</strong><span>${brainCount(snapshots.gaps)} gaps · ${brainCount(snapshots.conflicts)} conflitos em ${brainCount(snapshots.runs)} Runs</span></article>
+      <article><p class="micro">Índice</p><strong>${index.documents === null || index.documents === undefined ? 'Não observado' : `${brainCount(index.documents)} documentos`}</strong><span>${index.orphans === null || index.orphans === undefined ? 'órfãos não medidos' : `${brainCount(index.orphans)} órfãos`} · ${index.updated_at ? `geração ${fmtDate(index.updated_at, false)}` : 'sem geração auditada'}</span></article>
+      <article><p class="micro">Operação real</p><strong>${brainCount(accepted)} recuperações aceitas</strong><span>${brainCount(abstained)} abstiveram por evidência insuficiente · ${brainCount(unavailable)} falharam no histórico</span></article>
+      <article><p class="micro">Context snapshots</p><strong>${brainCount(snapshots.complete)}/${brainCount(snapshots.observed)} completos</strong><span>${brainCount(snapshots.gaps)} gaps · ${brainCount(snapshots.conflicts)} conflitos em ${brainCount(snapshots.runs)} Runs</span></article>
     </div>
 
     <details class="retrieval-operations">
@@ -963,13 +963,13 @@ function renderCompanyMap(anatomy) {
 
   return `<div class="company-map-home">
     <section class="company-map-search">
-      <div><p class="micro">MAPA VIVO</p><h2>Encontre o que existe na empresa.</h2><p>Áreas, conhecimento, Fontes e rotinas — sem transformar o Cérebro em outro ClickUp.</p></div>
+      <div><p class="micro">Mapa vivo</p><h2>Encontre o que existe na empresa.</h2><p>Áreas, conhecimento, Fontes e rotinas — sem transformar o Cérebro em outro ClickUp.</p></div>
       <label><span>Buscar no mapa da empresa</span><input type="search" data-brain-map-search value="${escapeHtml(state.brain.query)}" placeholder="Ofertas, Ads, founders, decisões…" autocomplete="off"><small>Busca local nos nomes e áreas já mapeados. Não chama modelo.</small></label>
     </section>
 
     <div class="company-map-layout">
       <section class="company-map-main" aria-labelledby="company-map-title">
-        <header><div><p class="micro">EMPRESA</p><h2 id="company-map-title">O que este Cérebro contém</h2></div><span>${visibleObjects} ${visibleObjects === 1 ? 'objeto visível' : 'objetos visíveis'}</span></header>
+        <header><div><p class="micro">Empresa</p><h2 id="company-map-title">O que este Cérebro contém</h2></div><span>${visibleObjects} ${visibleObjects === 1 ? 'objeto visível' : 'objetos visíveis'}</span></header>
         ${domains.length ? `<div class="company-domain-list">${domains.map((domain, index) => `<section class="company-domain">
           <div class="company-domain-heading"><span>${String(index + 1).padStart(2, '0')}</span><div><h3>${escapeHtml(domain.name)}</h3><p>${escapeHtml(domain.purpose)}</p></div></div>
           <ul>${domain.entries.map(brainHouseRow).join('')}</ul>
@@ -978,7 +978,7 @@ function renderCompanyMap(anatomy) {
 
       <aside class="company-map-rail">
         <section class="company-source-brief">
-          <header><div><p class="micro">FONTES</p><h2>De onde a realidade entra</h2></div><span>${map.source_summary.observed}/${map.source_summary.total}</span></header>
+          <header><div><p class="micro">Fontes</p><h2>De onde a realidade entra</h2></div><span>${map.source_summary.observed}/${map.source_summary.total}</span></header>
           <ul>${sources.map((source) => {
             const observedAt = source.last_access?.occurred_at || source.freshness_observed;
             return `<li><i class="${observedAt ? 'observed' : ''}"></i><div><strong>${escapeHtml(source.name)}</strong><span>${observedAt ? `observada ${fmtDate(observedAt, false)}` : 'declarada, ainda sem observação'}</span></div></li>`;
@@ -986,7 +986,7 @@ function renderCompanyMap(anatomy) {
           <button class="action" type="button" data-view="sources">Ver todas as Fontes →</button>
         </section>
         <section class="company-care-brief">
-          <p class="micro">PRECISA DE CUIDADO</p>
+          <p class="micro">Precisa de cuidado</p>
           <h2>Saúde da memória</h2>
           ${care.length ? `<ul>${care.map((item) => `<li><b>${escapeHtml(item.value)}</b><span>${escapeHtml(item.label)}</span></li>`).join('')}</ul>` : '<p class="company-care-clear">Nenhuma lacuna observada pede cuidado agora.</p>'}
           <button class="action" type="button" data-view="health">Abrir saúde →</button>
@@ -995,7 +995,7 @@ function renderCompanyMap(anatomy) {
     </div>
 
     <section class="company-routines">
-      <header><div><p class="micro">ROTINAS DO CÉREBRO</p><h2>O que mantém o contexto vivo</h2></div><button class="action" type="button" data-view="routines">Inspecionar rotinas →</button></header>
+      <header><div><p class="micro">Rotinas do Cérebro</p><h2>O que mantém o contexto vivo</h2></div><button class="action" type="button" data-view="routines">Inspecionar rotinas →</button></header>
       <div class="company-routine-list">${map.routines.map((routine) => `<article><div><i class="${routine.state === 'active' || routine.state === 'human-capture' ? 'observed' : ''}"></i><strong>${escapeHtml(routine.name)}</strong><span>${escapeHtml(label(routine.state))} · ${escapeHtml(routine.schedule)}</span></div><p>${escapeHtml(routine.output)}</p>${routine.last_observed ? `<time>${fmtDate(routine.last_observed, false)}</time>` : '<time>sem execução observada</time>'}</article>`).join('')}</div>
       <div class="daily-purpose"><b>Por que existe daily?</b><span>Para registrar o que mudou, por que mudou e qual decisão nasceu. Tarefa, dono e prazo continuam no ClickUp.</span></div>
     </section>
@@ -1049,20 +1049,20 @@ function nativeCapabilityAction(action) {
 
 function renderNativeCapabilities(capabilities = []) {
   if (!capabilities.length) return `<section class="native-capabilities">
-    <header><div><p class="micro">CAPACIDADES NATIVAS</p><h2>O que vem com o Cérebro</h2></div></header>
+    <header><div><p class="micro">Capacidades nativas</p><h2>O que vem com o Cérebro</h2></div></header>
     <p class="brain-clear-state">Nenhuma capacidade nativa foi projetada por esta instalação.</p>
   </section>`;
 
   return `<section class="native-capabilities" aria-labelledby="native-capabilities-title">
     <header>
-      <div><p class="micro">CAPACIDADES NATIVAS</p><h2 id="native-capabilities-title">O que já vem com o Cérebro</h2><p>Estas capacidades fazem parte do Company Brain. Sistemas usam essa base automaticamente quando o contrato permite; você não precisa rodar um comando. Capacidade é permanente. Skill é o instrumento. Provider é substituível.</p></div>
+      <div><p class="micro">Capacidades nativas</p><h2 id="native-capabilities-title">O que já vem com o Cérebro</h2><p>Estas capacidades fazem parte do Company Brain. Sistemas usam essa base automaticamente quando o contrato permite; você não precisa rodar um comando. Capacidade é permanente. Skill é o instrumento. Provider é substituível.</p></div>
       <button type="button" class="action" data-view="skills">Ver Skills →</button>
     </header>
     <div class="native-capability-grid">${capabilities.map((capability) => {
       return `<article class="native-capability-card state-${escapeHtml(capability.state)}">
         <div class="native-capability-heading"><span>${String(capability.position).padStart(2, '0')}</span>${badge(capability.state, nativeCapabilityStateTone(capability.state), nativeCapabilityStateLabel(capability.state))}</div>
         <div class="native-capability-copy"><h3>${escapeHtml(capability.name)}</h3><p>${escapeHtml(capability.promise)}</p></div>
-        <div class="native-capability-proof"><small>ESTADO NESTE CÉREBRO</small><strong>${escapeHtml(capability.proof.headline)}</strong></div>
+        <div class="native-capability-proof"><small>Estado neste Cérebro</small><strong>${escapeHtml(capability.proof.headline)}</strong></div>
         <footer>${nativeCapabilityAction(capability.action)}</footer>
       </article>`;
     }).join('')}</div>
@@ -1086,7 +1086,7 @@ function renderOverviewRecoveryAsset(health = {}) {
     : 'Não medido';
 
   return `<section class="brain-recovery-asset${measured ? '' : ' is-unmeasured'}" aria-labelledby="overview-retrieval-title">
-    <header><p class="micro">QUALIDADE DE RECUPERAÇÃO</p><span class="retrieval-live-state"><i class="${operation.current_status === 'healthy' ? 'observed' : ''}"></i>${escapeHtml(retrievalStatusLabel(operation.current_status))}</span></header>
+    <header><p class="micro">Qualidade de recuperação</p><span class="retrieval-live-state"><i class="${operation.current_status === 'healthy' ? 'observed' : ''}"></i>${escapeHtml(retrievalStatusLabel(operation.current_status))}</span></header>
     <div class="brain-recovery-asset-value"><strong>${overviewQualityText(quality)}</strong><div><h2 id="overview-retrieval-title">Hit@3</h2><p>${measured ? 'do contexto certo entre as três primeiras referências' : 'benchmark local ainda não auditado'}</p></div></div>
     <dl>
       <div><dt>Casos</dt><dd>${quality.cases == null ? '—' : brainCount(quality.cases)}</dd></div>
@@ -1121,7 +1121,7 @@ function renderOverviewActivity(center, health = {}) {
   const failed = operation.decisions?.retrieval_unavailable || 0;
   const runAt = latestRun?.completed_at || latestRun?.started_at;
   return `<section class="brain-activity-list">
-    <header><div><p class="micro">ATIVIDADE OBSERVADA</p><h2>O que aconteceu por último</h2></div><span>recibos locais</span></header>
+    <header><div><p class="micro">Atividade observada</p><h2>O que aconteceu por último</h2></div><span>recibos locais</span></header>
     <ol>
       <li><div><span>Último Run</span><strong>${latestRun ? escapeHtml(latestRun.system_name) : 'Nenhum Run observado'}</strong><small>${latestRun ? `${escapeHtml(integrityLabel(latestRun.integrity.state))}${runAt ? ` · ${fmtDate(runAt, false)}` : ''}` : 'o ledger ainda não deixou execução'}</small></div>${latestRun ? '<button type="button" data-brain-mode="recovery">Abrir →</button>' : ''}</li>
       <li><div><span>Última recuperação</span><strong>${operation.last_retrieval_at ? fmtDate(operation.last_retrieval_at, false) : 'Não observada'}</strong><small>${brainCount(accepted)} aceitas · ${brainCount(abstained)} abstiveram · ${brainCount(failed)} falharam no histórico</small></div><button type="button" data-brain-mode="recovery">Inspecionar →</button></li>
@@ -1138,7 +1138,7 @@ function renderBrainOverview(anatomy) {
   return `<div class="brain-control-view brain-overview">
     <section class="brain-overview-hero">
       <div class="brain-overview-lead">
-        <div><p class="micro">SEU CÉREBRO HOJE</p><h2>Contexto que já consegue voltar para o trabalho.</h2><p>Aqui você vê o que está vivo, o que foi provado e onde o Cérebro decidiu não inventar.</p></div>
+        <div><p class="micro">Seu Cérebro hoje</p><h2>Contexto que já consegue voltar para o trabalho.</h2><p>Aqui você vê o que está vivo, o que foi provado e onde o Cérebro decidiu não inventar.</p></div>
         <dl class="brain-overview-facts" aria-label="Estado operacional observado">
           <div><dt>Realidade entrando</dt><dd>${brainCount(overview.sources.observed)}/${brainCount(overview.sources.total)}</dd><span>Fontes observadas</span></div>
           <div><dt>Trabalho sustentado</dt><dd>${brainCount(runs.complete)}/${brainCount(runs.total)}</dd><span>Runs completos · ${brainCount(runs.limited)} limitados</span></div>
@@ -1148,17 +1148,17 @@ function renderBrainOverview(anatomy) {
       ${renderOverviewRecoveryAsset(anatomy.retrieval_health)}
     </section>
 
-    ${anatomy.activation.complete ? `<section class="brain-activation-receipt"><div><p class="micro">CÉREBRO BASE ATIVADO</p><h2>O contexto já provou que consegue voltar ao trabalho.</h2><p>A primeira missão fechou quando uma segunda tarefa reutilizou contexto aprovado sem releitura do bruto.</p></div><dl><div><dt>Concluído</dt><dd>${fmtDate(anatomy.activation.completed_at)}</dd></div><div><dt>Versão</dt><dd>${escapeHtml(anatomy.activation.product_version || 'não registrada')}</dd></div><div><dt>Recibo local</dt><dd><button type="button" data-copy-ref="${escapeHtml(anatomy.activation.receipt_ref)}">${escapeHtml(anatomy.activation.run_id || 'copiar referência')} ⧉</button></dd></div></dl></section>` : `<section class="brain-activation-receipt is-pending"><div><p class="micro">ATIVAÇÃO EM ABERTO</p><h2>A primeira missão ainda precisa provar reutilização.</h2><p>${anatomy.activation.completed_steps} de ${anatomy.activation.total_steps} passos foram observados.</p></div><button type="button" data-view="activation">Voltar à Primeira Missão →</button></section>`}
+    ${anatomy.activation.complete ? `<section class="brain-activation-receipt"><div><p class="micro">Cérebro base ativado</p><h2>O contexto já provou que consegue voltar ao trabalho.</h2><p>A primeira missão fechou quando uma segunda tarefa reutilizou contexto aprovado sem releitura do bruto.</p></div><dl><div><dt>Concluído</dt><dd>${fmtDate(anatomy.activation.completed_at)}</dd></div><div><dt>Versão</dt><dd>${escapeHtml(anatomy.activation.product_version || 'não registrada')}</dd></div><div><dt>Recibo local</dt><dd><button type="button" data-copy-ref="${escapeHtml(anatomy.activation.receipt_ref)}">${escapeHtml(anatomy.activation.run_id || 'copiar referência')} ⧉</button></dd></div></dl></section>` : `<section class="brain-activation-receipt is-pending"><div><p class="micro">Ativação em aberto</p><h2>A primeira missão ainda precisa provar reutilização.</h2><p>${anatomy.activation.completed_steps} de ${anatomy.activation.total_steps} passos foram observados.</p></div><button type="button" data-view="activation">Voltar à Primeira Missão →</button></section>`}
 
     <section class="brain-supported">
-      <header><div><p class="micro">O QUE ELE JÁ SUSTENTA</p><h2>Capacidades que já deixaram prova neste Cérebro</h2><p>Disponibilidade técnica não basta: cada linha mostra o efeito e a evidência observada nesta empresa.</p></div></header>
+      <header><div><p class="micro">O que ele já sustenta</p><h2>Capacidades que já deixaram prova neste Cérebro</h2><p>Disponibilidade técnica não basta: cada linha mostra o efeito e a evidência observada nesta empresa.</p></div></header>
       ${renderOverviewCapabilities(center.capabilities)}
     </section>
 
     <div class="brain-overview-lower">
       ${renderOverviewActivity(center, anatomy.retrieval_health)}
       <section class="brain-care-list">
-        <header><div><p class="micro">PEDE ATENÇÃO</p><h2>O que merece cuidado agora</h2></div><span>${overview.care.length} sinais</span></header>
+        <header><div><p class="micro">Pede atenção</p><h2>O que merece cuidado agora</h2></div><span>${overview.care.length} sinais</span></header>
         ${overview.care.length ? `<ol>${overview.care.map((item) => `<li><b>${item.count === 0 ? '—' : brainCount(item.count)}</b><span>${escapeHtml(careLabel(item))}</span></li>`).join('')}</ol>` : '<p class="brain-clear-state">Nenhum sinal operacional pede atenção agora.</p>'}
       </section>
     </div>
@@ -1174,7 +1174,7 @@ function renderBrainMemory(anatomy) {
   const memory = anatomy.control_center.memory;
   return `<div class="brain-control-view brain-memory-view">
     <section class="brain-lifecycle">
-      <header><div><p class="micro">ESTADOS DA MEMÓRIA</p><h2>O que é medido — e o que ainda não é.</h2><p>Contagem de pasta não substitui recibo de captura, processamento ou destilação.</p></div></header>
+      <header><div><p class="micro">Estados da memória</p><h2>O que é medido — e o que ainda não é.</h2><p>Contagem de pasta não substitui recibo de captura, processamento ou destilação.</p></div></header>
       <ol>${memory.lifecycle.map((step) => `<li class="${step.measured ? 'is-measured' : 'is-unmeasured'}"><span>${escapeHtml(step.name)}</span><strong>${step.measured ? brainCount(step.value) : 'Não instrumentado'}</strong><small>${step.measured ? escapeHtml(step.unit || 'objetos observados') : 'a transição ainda não emite recibo canônico'}</small></li>`).join('')}</ol>
       <div class="brain-freshness-note"><b>Frescor por Fonte · não calculado</b><span>${brainCount(memory.freshness.declared_policies)} políticas declaradas em texto; falta uma regra machine-readable para comparar vigência.</span></div>
     </section>
@@ -1187,7 +1187,7 @@ function renderBrainRecovery(anatomy) {
   return `<div class="brain-control-view brain-recovery-view">
     ${renderRetrievalHealth(anatomy.retrieval_health)}
     <section class="brain-run-ledger">
-      <header><div><p class="micro">QUALIDADE POR EXECUÇÃO</p><h2>O contexto que cada Run realmente recebeu</h2><p>Completo, limitado ou bloqueado nasce das dimensões do recibo — nunca de um score inventado.</p></div><div class="brain-integrity-legend"><span><i class="complete"></i>${brainCount(recovery.counts.complete)} completos</span><span><i class="limited"></i>${brainCount(recovery.counts.limited)} limitados</span><span><i class="blocked"></i>${brainCount(recovery.counts.blocked)} bloqueados</span></div></header>
+      <header><div><p class="micro">Qualidade por execução</p><h2>O contexto que cada Run realmente recebeu</h2><p>Completo, limitado ou bloqueado nasce das dimensões do recibo — nunca de um score inventado.</p></div><div class="brain-integrity-legend"><span><i class="complete"></i>${brainCount(recovery.counts.complete)} completos</span><span><i class="limited"></i>${brainCount(recovery.counts.limited)} limitados</span><span><i class="blocked"></i>${brainCount(recovery.counts.blocked)} bloqueados</span></div></header>
       <div class="brain-run-table" role="table" aria-label="Runs e contexto recuperado">
         <div class="brain-run-row brain-run-head" role="row"><span>Run / Sistema</span><span>Contexto</span><span>Recuperação</span><span>Martelo</span><span></span></div>
         ${recovery.runs.map((run) => `<button type="button" class="brain-run-row" role="row" data-open-brain-run="${escapeHtml(run.run_id)}">
@@ -1208,21 +1208,21 @@ function renderBrainLearning(anatomy) {
   const issues = learning.reconciliation.orphan_judgments + learning.reconciliation.duplicate_judgments;
   return `<div class="brain-control-view brain-learning-view">
     <section class="brain-learning-lead">
-      <div><p class="micro">CICLO DE APRENDIZADO</p><h2>${learning.candidates ? `${brainCount(learning.candidates)} melhorias aguardam prova.` : 'Ainda não existe melhoria pronta para promoção.'}</h2><p>Julgamento registra confiança. Outcome prova efeito. Só então uma mudança pode voltar ao Sistema.</p></div>
+      <div><p class="micro">Ciclo de aprendizado</p><h2>${learning.candidates ? `${brainCount(learning.candidates)} melhorias aguardam prova.` : 'Ainda não existe melhoria pronta para promoção.'}</h2><p>Julgamento registra confiança. Outcome prova efeito. Só então uma mudança pode voltar ao Sistema.</p></div>
       <ol><li><span>01</span><b>${brainCount(learning.judgments)}</b><small>julgamentos</small></li><li><span>02</span><b>${brainCount(learning.corrections)}</b><small>correções</small></li><li><span>03</span><b>${brainCount(learning.outcomes)}</b><small>Runs com outcome</small></li><li><span>04</span><b>${brainCount(learning.candidates)}</b><small>candidatos</small></li></ol>
     </section>
 
     <section class="brain-learning-status ${learning.candidates ? '' : 'is-empty'}">
-      <div><p class="micro">CANDIDATOS</p><h2>${learning.candidates ? 'Fila materializada' : 'Nenhum candidato materializado'}</h2><p>${learning.candidates ? 'A promoção continua dependente de prova e martelo humano.' : 'Isso não significa que o Cérebro não aprendeu nada; significa que nenhum Learning Candidate Receipt foi emitido.'}</p></div>
+      <div><p class="micro">Candidatos</p><h2>${learning.candidates ? 'Fila materializada' : 'Nenhum candidato materializado'}</h2><p>${learning.candidates ? 'A promoção continua dependente de prova e martelo humano.' : 'Isso não significa que o Cérebro não aprendeu nada; significa que nenhum Learning Candidate Receipt foi emitido.'}</p></div>
       <span>${learning.promotions.measured ? brainCount(learning.promotions.value) : 'Promoções · não instrumentadas'}</span>
     </section>
 
     <section class="brain-learning-ledger">
-      <header><div><p class="micro">LINHAGEM OBSERVADA</p><h2>Runs que chegaram a julgamento ou outcome</h2></div><span>${runs.length} Runs</span></header>
+      <header><div><p class="micro">Linhagem observada</p><h2>Runs que chegaram a julgamento ou outcome</h2></div><span>${runs.length} Runs</span></header>
       ${runs.length ? `<ul>${runs.map((run) => `<li><div><strong>${escapeHtml(run.system_name)}</strong><span>${fmtDate(run.completed_at || run.started_at, false)} · ${escapeHtml(run.run_id)}</span></div><span>${run.judgments ? `${run.judgments} julgamento${run.judgments === 1 ? '' : 's'}` : 'sem recibo de julgamento'} · ${run.outcomes ? `${run.outcomes} outcome${run.outcomes === 1 ? '' : 's'}` : 'sem outcome'}</span><button type="button" data-open-brain-run="${escapeHtml(run.run_id)}">Inspecionar →</button></li>`).join('')}</ul>` : '<p class="brain-clear-state">Nenhum Run chegou ao ciclo observado.</p>'}
     </section>
 
-    <section class="brain-reconciliation ${issues ? 'has-issues' : ''}"><div><p class="micro">RECONCILIAÇÃO</p><h2>${issues ? `${brainCount(issues)} inconsistências pedem revisão` : 'Ledger e recibos conciliados'}</h2></div><p>${brainCount(learning.reconciliation.orphan_judgments)} julgamento aponta para Run ausente · ${brainCount(learning.reconciliation.duplicate_judgments)} julgamento excedente no mesmo Run.</p></section>
+    <section class="brain-reconciliation ${issues ? 'has-issues' : ''}"><div><p class="micro">Reconciliação</p><h2>${issues ? `${brainCount(issues)} inconsistências pedem revisão` : 'Ledger e recibos conciliados'}</h2></div><p>${brainCount(learning.reconciliation.orphan_judgments)} julgamento aponta para Run ausente · ${brainCount(learning.reconciliation.duplicate_judgments)} julgamento excedente no mesmo Run.</p></section>
   </div>`;
 }
 
@@ -1230,22 +1230,22 @@ function renderBrainArchitecture(anatomy) {
   const architecture = anatomy.control_center.architecture;
   const provider = architecture.provider;
   return `<div class="brain-control-view brain-architecture-view">
-    <section class="brain-architecture-lead"><div><p class="micro">INFRAESTRUTURA GOVERNADA</p><h2>O protocolo é o produto. O motor é substituível.</h2><p>Sistemas consomem um contrato genérico de recuperação; a implementação atual fica atrás dessa fronteira.</p></div><dl><div><dt>Retrieval Provider</dt><dd>${escapeHtml(provider.name || provider.provider_id || 'não declarado')}${provider.version ? ` · v${escapeHtml(provider.version)}` : ''}</dd></div><div><dt>Implementação atual</dt><dd>${escapeHtml(provider.implementation || 'não observada')}${provider.implementation_version ? ` ${escapeHtml(provider.implementation_version)}` : ''} · substituível</dd></div><div><dt>Estado operacional</dt><dd>${escapeHtml(retrievalStatusLabel(architecture.operation.current_status))} · circuito ${escapeHtml(architecture.operation.circuit || 'não observado')}</dd></div></dl></section>
+    <section class="brain-architecture-lead"><div><p class="micro">Infraestrutura governada</p><h2>O protocolo é o produto. O motor é substituível.</h2><p>Sistemas consomem um contrato genérico de recuperação; a implementação atual fica atrás dessa fronteira.</p></div><dl><div><dt>Retrieval Provider</dt><dd>${escapeHtml(provider.name || provider.provider_id || 'não declarado')}${provider.version ? ` · v${escapeHtml(provider.version)}` : ''}</dd></div><div><dt>Implementação atual</dt><dd>${escapeHtml(provider.implementation || 'não observada')}${provider.implementation_version ? ` ${escapeHtml(provider.implementation_version)}` : ''} · substituível</dd></div><div><dt>Estado operacional</dt><dd>${escapeHtml(retrievalStatusLabel(architecture.operation.current_status))} · circuito ${escapeHtml(architecture.operation.circuit || 'não observado')}</dd></div></dl></section>
 
     <section class="brain-architecture-contracts">
-      <header><div><p class="micro">CONTRATOS</p><h2>A camada constitucional</h2></div></header>
+      <header><div><p class="micro">Contratos</p><h2>A camada constitucional</h2></div></header>
       <dl><div><dt>System Contracts</dt><dd>${brainCount(architecture.protocol.system_contracts)}</dd><span>declaram fontes, recuperação, evidência e condições de parada</span></div><div><dt>Source Contracts</dt><dd>${brainCount(architecture.protocol.source_contracts)}</dd><span>declaram casa de verdade, binding e política de frescor</span></div><div><dt>Retrieval Contract</dt><dd>${architecture.protocol.retrieval_versions.length ? architecture.protocol.retrieval_versions.map((version) => `v${escapeHtml(version)}`).join(' · ') : 'não observado'}</dd><span>lido pela experiência e pelo runtime</span></div><div><dt>Índice atual</dt><dd>${architecture.index.documents == null ? 'não observado' : `${brainCount(architecture.index.documents)} docs`}</dd><span>${architecture.index.updated_at ? `geração ${fmtDate(architecture.index.updated_at, false)}` : 'sem geração auditada'}</span></div></dl>
     </section>
 
     <section class="brain-context-agreement">
-      <header><div><p class="micro">ACORDO DE CONTEXTO</p><h2>O Sistema pede contexto; o Cérebro decide como recuperá-lo.</h2><p>A fonte continua sendo a casa da verdade. O contrato do Sistema registra o que precisa, a janela, o frescor, a evidência mínima e quando parar.</p></div></header>
+      <header><div><p class="micro">Acordo de contexto</p><h2>O Sistema pede contexto; o Cérebro decide como recuperá-lo.</h2><p>A fonte continua sendo a casa da verdade. O contrato do Sistema registra o que precisa, a janela, o frescor, a evidência mínima e quando parar.</p></div></header>
       <ol><li><span>01</span><div><strong>Fonte</strong><p>Guarda o dado bruto e sua autoridade.</p></div></li><li><span>02</span><div><strong>Cérebro</strong><p>Coleta, prepara, destila, recupera e registra o contexto usado.</p></div></li><li><span>03</span><div><strong>Sistema</strong><p>Consome o contexto necessário e produz o resultado contratado.</p></div></li><li><span>04</span><div><strong>Run Record</strong><p>Prova se houve recuperação pelo Cérebro ou leitura direta autorizada da Fonte.</p></div></li></ol>
       <p class="brain-context-rule"><b>Leitura direta é exceção explícita.</b> Ela só acontece quando o contrato e a permissão do Sistema exigem dado fresco ou estruturado na Fonte; nunca por atalho invisível.</p>
     </section>
 
     ${renderBrainGraphPreview(state.brainGraph)}
     <p class="brain-graph-disclaimer">Este grafo é um mapa estrutural para inspeção. Ele não prova GraphRAG nem participa da recuperação observada hoje.</p>
-    <section class="brain-privacy-boundary"><p class="micro">FRONTEIRA DE PRIVACIDADE</p><div><strong>Referências, não payload.</strong><span>Esta área não expõe query, conteúdo, snippet, hashes completos ou erro bruto.</span></div></section>
+    <section class="brain-privacy-boundary"><p class="micro">Fronteira de privacidade</p><div><strong>Referências, não payload.</strong><span>Esta área não expõe query, conteúdo, snippet, hashes completos ou erro bruto.</span></div></section>
   </div>`;
 }
 
@@ -1314,7 +1314,7 @@ function renderBrainUpdates(anatomy) {
     : updateReasonCopy(installation.reason_code);
   return `<div class="brain-control-view brain-updates-view">
     <section class="brain-update-hero">
-      <div><p class="micro">VERSÃO E CONTINUIDADE</p><h2>Seu contexto fica. O motor evolui.</h2><p>Compatibilidade, atualização do software e catálogo da Society são estados diferentes — e aparecem separados aqui.</p></div>
+      <div><p class="micro">Versão e continuidade</p><h2>Seu contexto fica. O motor evolui.</h2><p>Compatibilidade, atualização do software e catálogo da Society são estados diferentes — e aparecem separados aqui.</p></div>
       <div class="brain-update-identity"><span>${escapeHtml(profile)}</span><strong>v${escapeHtml(installation.version)}</strong><small>${escapeHtml(distribution)} · runtime ${escapeHtml(installation.runtime_mode || 'não declarado')}</small></div>
     </section>
 
@@ -1323,7 +1323,7 @@ function renderBrainUpdates(anatomy) {
 
     <section class="brain-update-now">
       <div class="brain-update-now-copy">
-        <p class="micro">SEU CÉREBRO · MOTOR & CONSOLE</p>
+        <p class="micro">Seu Cérebro · Motor & console</p>
         <div class="brain-update-status"><span class="${escapeHtml(remoteCopy.tone)}"></span><div><strong>${escapeHtml(remoteCopy.label)}</strong><small>${escapeHtml(remoteCopy.detail)}</small></div></div>
         <p>Você está usando o motor v${escapeHtml(motor.version)}. A verificação procura somente metadados da release pública mais recente.</p>
       </div>
@@ -1334,7 +1334,7 @@ function renderBrainUpdates(anatomy) {
     </section>
 
     <section class="brain-news">
-      <header><div><p class="micro">DA INEVITA</p><h2>O que muda para você</h2></div><span>canal público · funciona offline</span></header>
+      <header><div><p class="micro">Da INEVITA</p><h2>O que muda para você</h2></div><span>canal público · funciona offline</span></header>
       ${news.length ? `<div class="brain-news-list">${news.map((entry) => `<article class="brain-news-entry">
         <div class="brain-news-meta"><span>${escapeHtml(communicationKind(entry.kind))}</span><time>${fmtDate(entry.published_at, false)}</time>${entry.release_version ? `<b>v${escapeHtml(entry.release_version)}</b>` : ''}</div>
         <h3>${escapeHtml(entry.title)}</h3><p>${escapeHtml(entry.summary)}</p>
@@ -1343,7 +1343,7 @@ function renderBrainUpdates(anatomy) {
     </section>
 
     <section class="brain-releases">
-      <header><div><p class="micro">NOVOS RELEASES</p><h2>Cérebro e Sistemas evoluem em trilhas diferentes</h2></div><p>Atualizar o Cérebro não instala nem ativa um Sistema.</p></header>
+      <header><div><p class="micro">Novos releases</p><h2>Cérebro e Sistemas evoluem em trilhas diferentes</h2></div><p>Atualizar o Cérebro não instala nem ativa um Sistema.</p></header>
       <div class="brain-release-board">
         <article class="brain-release-column">
           <header><div><span class="brain-release-mark">C</span><div><strong>Cérebro</strong><small>motor, cockpit e protocolos</small></div></div><b>${brainReleases.length} no histórico</b></header>
@@ -1358,21 +1358,21 @@ function renderBrainUpdates(anatomy) {
 
     <section class="brain-update-grid brain-update-detail-grid">
       <article class="brain-update-card">
-        <header><span>01</span><div><p class="micro">CÉREBRO DA EMPRESA</p><h3>Sua instalação privada</h3></div></header>
+        <header><span>01</span><div><p class="micro">Cérebro da empresa</p><h3>Sua instalação privada</h3></div></header>
         <dl><div><dt>Versão</dt><dd>v${escapeHtml(installation.version)}</dd></div><div><dt>Brain Manifest</dt><dd>${installation.manifest_version ? `v${escapeHtml(installation.manifest_version)}` : 'não observado'}</dd></div><div><dt>Compatibilidade</dt><dd>${installation.compatibility_percent == null ? 'não medida' : `${brainCount(installation.compatibility_percent)}%`}</dd></div><div><dt>Canal</dt><dd>${managed ? 'gerenciado' : 'ainda não gerenciado'}</dd></div></dl>
         <p>${escapeHtml(unmanagedNote)}</p>
         ${managed ? '' : '<button type="button" class="text-action" data-view="compatibility">Ver conformidade antes da migração →</button>'}
       </article>
 
       <article class="brain-update-card">
-        <header><span>02</span><div><p class="micro">SOCIETY</p><h3>Catálogo distribuído com o motor</h3></div></header>
+        <header><span>02</span><div><p class="micro">Society</p><h3>Catálogo distribuído com o motor</h3></div></header>
         <div class="brain-society-version"><strong>v${escapeHtml(society.distribution_version)}</strong><span>${brainCount(society.visible)} no catálogo · ${brainCount(society.installed)} destes já ${society.installed === 1 ? 'está' : 'estão'} no Cérebro</span></div>
         <p>Novas fichas, contratos e releases publicados chegam no pacote do motor. Seus Sistemas instalados, grants, julgamentos e contexto continuam locais.</p>
         <button type="button" class="text-action" data-view="society">Abrir catálogo da Society →</button>
       </article>
     </section>
 
-    <section class="brain-update-boundary"><div><p class="micro">GARANTIA DE ATUALIZAÇÃO</p><h3>Motor entra. Contexto não sai.</h3></div><ul><li>sem atualização silenciosa</li><li>release publicada obrigatória</li><li>caminhos do dono preservados</li><li>checkout Git nunca sobrescrito</li></ul></section>
+    <section class="brain-update-boundary"><div><p class="micro">Garantia de atualização</p><h3>Motor entra. Contexto não sai.</h3></div><ul><li>sem atualização silenciosa</li><li>release publicada obrigatória</li><li>caminhos do dono preservados</li><li>checkout Git nunca sobrescrito</li></ul></section>
   </div>`;
 }
 
@@ -1514,9 +1514,9 @@ function renderToday() {
   const laterDecisions = queue?.available ? queue.open.slice(5) : [];
   const priorityRoutines = routines.slice(0, 4);
   const laterRoutines = routines.slice(4);
-  return `<div class="section-heading"><div><p class="eyebrow">AGORA</p><h2>Mesa de operação</h2></div><p>Primeiro o que pede julgamento; depois o que já está pronto para trabalhar.</p></div>
+  return `<div class="section-heading"><div><p class="eyebrow">Agora</p><h2>Mesa de operação</h2></div><p>Primeiro o que pede julgamento; depois o que já está pronto para trabalhar.</p></div>
     ${queue?.available ? `<div class="today-block"><div class="subheading"><h3>🔨 Decidir agora</h3><span>${queue.open_count} abertas · ${queue.decided_total} decididas</span></div><div class="decision-list" role="list">${decisionRows || '<p class="muted">Fila vazia — nada espera seu martelo.</p>'}</div>${laterDecisions.length ? `<details class="today-more"><summary>Ver mais ${laterDecisions.length} decisões</summary><div class="decision-list" role="list">${laterDecisions.map((item, index) => decisionRow(item, index + 5)).join('')}</div></details>` : ''}<div class="boundary-note"><b>Uma fila, um juiz</b>O veredito acontece na mesa de martelo; o Console mostra a verdade, não a substitui.</div></div>` : ''}
-    ${pending.length ? `<div class="today-block"><p class="micro">OUTPUTS PARA JULGAR</p>${judgmentList(pending)}</div>` : ''}
+    ${pending.length ? `<div class="today-block"><p class="micro">Outputs para julgar</p>${judgmentList(pending)}</div>` : ''}
     <div class="today-block"><div class="subheading"><h3>Trabalhar agora</h3><span>${routines.length} rotinas no radar</span></div><div class="routine-list">${priorityRoutines.length ? priorityRoutines.map(routineCard).join('') : empty('Nenhuma rotina pede atenção', 'Rotinas ativas e prontas aparecem aqui.')}</div>${laterRoutines.length ? `<details class="today-more"><summary>Ver mais ${laterRoutines.length} rotinas</summary><div class="routine-list">${laterRoutines.map(routineCard).join('')}</div></details>` : ''}</div>`;
 }
 
@@ -1596,7 +1596,7 @@ const TIMING_LABELS = {
 function runTimingPanel(graph) {
   const timing = graph.trace_timing;
   if (!timing) return '';
-  if (timing.assurance === 'total-only') return `<div class="run-timing-head"><div><p class="micro">TEMPO DO RUN</p><strong>${fmtDuration(timing.total_duration_ms)}</strong></div><span>total disponível</span></div><p class="run-timing-limited">Trace reconstruído: não existe granularidade suficiente para atribuir duração às etapas.</p>`;
+  if (timing.assurance === 'total-only') return `<div class="run-timing-head"><div><p class="micro">Tempo do Run</p><strong>${fmtDuration(timing.total_duration_ms)}</strong></div><span>total disponível</span></div><p class="run-timing-limited">Trace reconstruído: não existe granularidade suficiente para atribuir duração às etapas.</p>`;
   const measured = timing.coverage_ratio > 0.999 ? '≈100' : String(Math.round((timing.coverage_ratio || 0) * 100));
   const rows = timing.critical_path.map((stage) => {
     const share = stage.duration_ms === null ? 0 : Math.max(0, (stage.share_of_total || 0) * 100);
@@ -1612,7 +1612,7 @@ function runTimingPanel(graph) {
   const modelNote = model
     ? `<button type="button" class="run-timing-model" ${model.node_id ? `data-canvas-inspect-node="${escapeHtml(model.node_id)}"` : 'disabled'}><span>↳ Modelo</span><b>${model.duration_ms === null ? 'duração não separada neste trace' : fmtDuration(model.duration_ms)}</b></button>`
     : '';
-  return `<div class="run-timing-head"><div><p class="micro">TEMPO DO RUN</p><strong>${fmtDuration(timing.total_duration_ms)}</strong></div><span>${measured}% medido pelo trace</span></div><div class="run-timing-bars">${rows}</div>${modelNote}<div class="run-timing-foot"><span>${timing.dominant_step_id ? `Gargalo: ${escapeHtml(TIMING_LABELS[timing.critical_path.find((stage) => stage.step_id === timing.dominant_step_id)?.step_type] || timing.dominant_step_id)}` : 'Sem etapa dominante'}</span><b>${fmtDuration(timing.unattributed_duration_ms)} entre etapas</b></div>`;
+  return `<div class="run-timing-head"><div><p class="micro">Tempo do Run</p><strong>${fmtDuration(timing.total_duration_ms)}</strong></div><span>${measured}% medido pelo trace</span></div><div class="run-timing-bars">${rows}</div>${modelNote}<div class="run-timing-foot"><span>${timing.dominant_step_id ? `Gargalo: ${escapeHtml(TIMING_LABELS[timing.critical_path.find((stage) => stage.step_id === timing.dominant_step_id)?.step_type] || timing.dominant_step_id)}` : 'Sem etapa dominante'}</span><b>${fmtDuration(timing.unattributed_duration_ms)} entre etapas</b></div>`;
 }
 
 function renderCanvas() {
@@ -1648,7 +1648,7 @@ function renderCanvas() {
         <button class="canvas-tool ${state.canvas.editable ? 'active' : ''}" data-canvas-edit>${state.canvas.editable ? 'Bloquear' : 'Reorganizar'}</button>
         <button class="canvas-tool primary" data-canvas-save disabled>Salvar</button>
       </div>
-      <aside id="canvas-inspector" class="canvas-inspector"><p class="micro">DETALHES DO OBJETO</p><h3>Selecione um nó</h3><p>Fontes são casas de verdade. Etapas são contrato. Artefatos são os objetos que realmente atravessaram uma execução.</p></aside>
+      <aside id="canvas-inspector" class="canvas-inspector"><p class="micro">Detalhes do objeto</p><h3>Selecione um nó</h3><p>Fontes são casas de verdade. Etapas são contrato. Artefatos são os objetos que realmente atravessaram uma execução.</p></aside>
     </div>
     ${cockpitSystem ? systemCockpit(cockpitSystem) : ''}
     <details class="canvas-accessible"><summary>Ver equivalente em lista</summary><div id="canvas-list"></div></details>
@@ -1659,13 +1659,13 @@ function renderCanvas() {
 function renderJudgments() {
   const pending = visibleJudgments().filter((item) => item.judgment.status === 'pending');
   const decided = visibleJudgments().filter((item) => item.judgment.status !== 'pending');
-  return `<div class="section-heading"><div><p class="eyebrow">MARTELO HUMANO</p><h2>Caixa de Julgamento</h2></div><p>Abra o output privado, decida e deixe rastro. Nenhum botão desta tela executa ação externa.</p></div>
+  return `<div class="section-heading"><div><p class="eyebrow">Martelo humano</p><h2>Caixa de Julgamento</h2></div><p>Abra o output privado, decida e deixe rastro. Nenhum botão desta tela executa ação externa.</p></div>
     <div class="judgment-section"><div class="subheading"><h3>Pendentes</h3><span>${pending.length}</span></div>${pending.length ? judgmentList(pending) : empty('Nenhum output pendente', 'O próximo run concluído aparecerá aqui para julgamento.')}</div>
     <div class="judgment-section"><div class="subheading"><h3>Histórico</h3><span>${decided.length}</span></div>${decided.length ? judgmentList(decided) : '<p class="muted">Nenhum julgamento registrado ainda.</p>'}</div>`;
 }
 
 function renderAreas() {
-  return `<div class="section-heading"><div><p class="eyebrow">RESPONSABILIDADE OPERACIONAL</p><h2>Áreas responsáveis</h2></div><p>Áreas declaram quem responde internamente. Funções empresariais classificam o trabalho no Launcher e na Society.</p></div><div class="object-grid">${state.model.areas.map((area) => `<article class="object-card" data-kind="area"><span class="object-index">${String(area.system_refs.length).padStart(2, '0')}</span><p class="micro">ÁREA RESPONSÁVEL</p><h3>${escapeHtml(area.name)}</h3><p>${area.system_refs.length} sistema(s) · ${area.routine_refs.length} rotina(s)</p><div class="ref-list">${area.system_refs.map((ref) => `<code>${escapeHtml(ref)}</code>`).join('')}</div></article>`).join('') || empty('Nenhuma área responsável declarada', 'Áreas aparecem quando Sistemas possuem contratos válidos.')}</div>`;
+  return `<div class="section-heading"><div><p class="eyebrow">Responsabilidade operacional</p><h2>Áreas responsáveis</h2></div><p>Áreas declaram quem responde internamente. Funções empresariais classificam o trabalho no Launcher e na Society.</p></div><div class="object-grid">${state.model.areas.map((area) => `<article class="object-card" data-kind="area"><span class="object-index">${String(area.system_refs.length).padStart(2, '0')}</span><p class="micro">Área responsável</p><h3>${escapeHtml(area.name)}</h3><p>${area.system_refs.length} sistema(s) · ${area.routine_refs.length} rotina(s)</p><div class="ref-list">${area.system_refs.map((ref) => `<code>${escapeHtml(ref)}</code>`).join('')}</div></article>`).join('') || empty('Nenhuma área responsável declarada', 'Áreas aparecem quando Sistemas possuem contratos válidos.')}</div>`;
 }
 
 function systemOperational(system) {
@@ -1863,7 +1863,7 @@ function systemCard(system) {
 
 function renderSystems() {
   const available = visibleSystems();
-  if (!available.length) return `<div class="section-heading"><div><p class="eyebrow">RESULTADOS</p><h2>Sistemas</h2></div></div>${empty('Nenhum Sistema nesta área', 'O Console não cria verdade editorial: ele espera System Contracts reais.')}`;
+  if (!available.length) return `<div class="section-heading"><div><p class="eyebrow">Resultados</p><h2>Sistemas</h2></div></div>${empty('Nenhum Sistema nesta área', 'O Console não cria verdade editorial: ele espera System Contracts reais.')}`;
   const query = state.systems.query.trim().toLocaleLowerCase('pt-BR');
   const systems = available.filter((system) => {
     const categoryMatch = state.systems.category === 'all' || systemBusinessFunction(system) === state.systems.category;
@@ -1892,8 +1892,8 @@ function renderSystems() {
     const name = { active: 'ativos', configured: 'configurados', mapped: 'mapeados' }[stage];
     return `${count} ${name}`;
   }).join(' · ');
-  return `<div class="section-heading"><div><p class="eyebrow">LAUNCHER</p><h2>Meus Sistemas</h2></div><p>Conheça o Sistema antes de abrir sua aplicação. Contratos, contexto, Runs e confiança continuam no Cockpit.</p></div>
-    <div class="systems-launcher-toolbar"><label><span>Buscar Sistema</span><input type="search" data-system-search value="${escapeHtml(state.systems.query)}" placeholder="Nome, resultado, publisher ou responsável" autocomplete="off"></label><div class="systems-filter-stack"><div><span class="micro">ESTÁGIO</span><div class="systems-filter-row" aria-label="Filtrar por estágio">${stageButtons}</div></div><div><span class="micro">FUNÇÃO</span><div class="systems-filter-row" aria-label="Filtrar por função empresarial">${categoryButtons}</div></div></div></div>
+  return `<div class="section-heading"><div><p class="eyebrow">Launcher</p><h2>Meus Sistemas</h2></div><p>Conheça o Sistema antes de abrir sua aplicação. Contratos, contexto, Runs e confiança continuam no Cockpit.</p></div>
+    <div class="systems-launcher-toolbar"><label><span>Buscar Sistema</span><input type="search" data-system-search value="${escapeHtml(state.systems.query)}" placeholder="Nome, resultado, publisher ou responsável" autocomplete="off"></label><div class="systems-filter-stack"><div><span class="micro">Estágio</span><div class="systems-filter-row" aria-label="Filtrar por estágio">${stageButtons}</div></div><div><span class="micro">Função</span><div class="systems-filter-row" aria-label="Filtrar por função empresarial">${categoryButtons}</div></div></div></div>
     <div class="systems-results"><span>${escapeHtml(visibleSummary)}</span><small>${escapeHtml(lifecycle)} · identidade publicada pelo Experience Manifest; catálogo público entra na Society.</small></div>
     <div class="systems-market-grid">${systems.map(systemCard).join('') || empty('Nenhum Sistema encontrado', 'Limpe a busca ou escolha outra função empresarial.')}</div>`;
 }
@@ -1981,14 +1981,14 @@ function renderSkills() {
     ? `Skills atravessam áreas; o filtro ${operatingAreaName(state.operatingAreaFilter)} não esconde capacidades do Cérebro.`
     : 'Skills pertencem ao Cérebro inteiro; Sistemas apenas declaram quais delas consomem.';
   return `<div class="skills-hero">
-      <div><p class="eyebrow">COMANDOS ESPECIALIZADOS</p><h2>Skills</h2><p>Instrumentos executáveis que Sistemas e agentes podem usar. Abra uma Skill para entender quando usar, onde está instalada e quais Sistemas a declaram.</p></div>
+      <div><p class="eyebrow">Comandos especializados</p><h2>Skills</h2><p>Instrumentos executáveis que Sistemas e agentes podem usar. Abra uma Skill para entender quando usar, onde está instalada e quais Sistemas a declaram.</p></div>
       <div class="skills-summary"><strong>${counts.company}</strong><span>nesta empresa</span><i></i><strong>${counts.available}</strong><span>alinhadas</span>${counts.degraded ? `<i></i><strong class="attention">${counts.degraded}</strong><span>a sincronizar</span>` : ''}</div>
     </div>
     <div class="skills-boundary"><span>${counts.unique} capacidades encontradas</span><small>${escapeHtml(scopeNote)}</small></div>
     <div class="skills-toolbar"><label><span>Buscar Skill</span><input type="search" data-skill-search value="${escapeHtml(state.skills.query)}" placeholder="Nome, tarefa ou Sistema" autocomplete="off"></label><div class="skill-filter-group" aria-label="Origem">${originFilters}</div><div class="skill-filter-group" aria-label="Saúde">${statusFilters}</div><div class="skill-filter-group" aria-label="Vínculo">${linkFilters}</div></div>
     <div class="skills-results"><span>${visible.length} visíveis</span><small>Detalhes técnicos aparecem ao abrir uma Skill.</small></div>
     <div class="skills-grid">${visible.map(skillCard).join('') || empty('Nenhuma Skill encontrada', 'Limpe a busca ou escolha outro filtro.')}</div>
-    <section class="skill-executors-section"><div class="section-heading"><div><p class="eyebrow">EXECUÇÃO RELACIONADA</p><h2>Modelos não são Skills</h2></div><p>Bindings dizem onde uma capacidade pode executar. O modelo é declarado pelo provider; não representa qualidade ou produto instalado.</p></div><div class="skill-executors">${catalog.executors.map(executorCard).join('') || empty('Nenhum executor ligado', 'Skills continuam catalogadas, mas não há binding local de modelo.')}</div><div class="boundary-note"><b>Fronteira local</b>O Cockpit mostra adapter, política e autenticação. Credenciais, corpo da Skill, prompt e output não entram neste read model.</div></section>`;
+    <section class="skill-executors-section"><div class="section-heading"><div><p class="eyebrow">Execução relacionada</p><h2>Modelos não são Skills</h2></div><p>Bindings dizem onde uma capacidade pode executar. O modelo é declarado pelo provider; não representa qualidade ou produto instalado.</p></div><div class="skill-executors">${catalog.executors.map(executorCard).join('') || empty('Nenhum executor ligado', 'Skills continuam catalogadas, mas não há binding local de modelo.')}</div><div class="boundary-note"><b>Fronteira local</b>O Cockpit mostra adapter, política e autenticação. Credenciais, corpo da Skill, prompt e output não entram neste read model.</div></section>`;
 }
 
 function openSkill(skillId) {
@@ -2000,7 +2000,7 @@ function openSkill(skillId) {
       ? skill.company.agent_runtime_aligned ? 'Alinhado à fonte canônica' : 'Divergente da fonte canônica'
       : 'Runtime derivado ausente'
     : 'Não instalada nesta empresa';
-  $('#drawer-content').innerHTML = `<div class="drawer-head"><p class="eyebrow">SKILL</p><h2>${escapeHtml(skillTitle(skill.name))}</h2>${skillStatusBadge(skill)}</div>
+  $('#drawer-content').innerHTML = `<div class="drawer-head"><p class="eyebrow">Skill</p><h2>${escapeHtml(skillTitle(skill.name))}</h2>${skillStatusBadge(skill)}</div>
     <code class="skill-drawer-id">/${escapeHtml(skill.skill_id)}</code>
     <div class="boundary-note"><b>Capacidade, não aplicativo</b>Esta Skill encapsula julgamento executável. O resultado, os gates e a personalidade continuam pertencendo ao Sistema que a usa.</div>
     <section class="drawer-section"><h3>Quando usar</h3><p>${escapeHtml(skill.description)}</p></section>
@@ -2027,7 +2027,7 @@ async function loadSkills() {
 }
 
 function renderSources() {
-  return `<div class="section-heading"><div><p class="eyebrow">CASAS DE VERDADE</p><h2>Fontes</h2></div><p>Mapear não é conectar. A garantia mostrada depende de quem realmente possui a custódia.</p></div><div class="object-grid">${visibleSources().map((source) => `<article class="object-card" data-kind="source" data-open-source="${escapeHtml(source.source_id)}" role="button" tabindex="0"><div class="object-card-top">${badge(source.status, source.status === 'active' ? 'good' : 'neutral')}${badge(source.assurance, source.assurance === 'runtime-enforced' ? 'good' : 'neutral')}</div><p class="micro">${escapeHtml(source.type)}</p><h3>${escapeHtml(source.name)}</h3><p>Custódia: ${escapeHtml(label(source.custody))} · PII: ${escapeHtml(label(source.pii))}</p><div class="ref-list">${source.modes.map((mode) => `<code>${escapeHtml(mode)}</code>`).join('')}</div></article>`).join('') || empty('Nenhuma Fonte contratada', 'Fontes aparecem sem abrir ou copiar o conteúdo original.')}</div>`;
+  return `<div class="section-heading"><div><p class="eyebrow">Casas de verdade</p><h2>Fontes</h2></div><p>Mapear não é conectar. A garantia mostrada depende de quem realmente possui a custódia.</p></div><div class="object-grid">${visibleSources().map((source) => `<article class="object-card" data-kind="source" data-open-source="${escapeHtml(source.source_id)}" role="button" tabindex="0"><div class="object-card-top">${badge(source.status, source.status === 'active' ? 'good' : 'neutral')}${badge(source.assurance, source.assurance === 'runtime-enforced' ? 'good' : 'neutral')}</div><p class="micro">${escapeHtml(source.type)}</p><h3>${escapeHtml(source.name)}</h3><p>Custódia: ${escapeHtml(label(source.custody))} · PII: ${escapeHtml(label(source.pii))}</p><div class="ref-list">${source.modes.map((mode) => `<code>${escapeHtml(mode)}</code>`).join('')}</div></article>`).join('') || empty('Nenhuma Fonte contratada', 'Fontes aparecem sem abrir ou copiar o conteúdo original.')}</div>`;
 }
 
 function experimentProgress(experiment) {
@@ -2050,7 +2050,7 @@ function renderExperiments() {
   const ready = experiments.filter((item) => item.status === 'ready-for-read').length;
   const decided = experiments.filter((item) => item.status === 'decided').length;
   const unlinked = experiments.filter((item) => item.learning_status === 'unlinked').length;
-  return `<div class="section-heading"><div><p class="eyebrow">DECISÃO ANTES DO DADO</p><h2>Experimentos</h2></div><p>Uma mudança controlada atravessa Sistemas, Runs, medição e martelo. Contrato congelado não se edita depois do dado.</p></div>
+  return `<div class="section-heading"><div><p class="eyebrow">Decisão antes do dado</p><h2>Experimentos</h2></div><p>Uma mudança controlada atravessa Sistemas, Runs, medição e martelo. Contrato congelado não se edita depois do dado.</p></div>
     <div class="experiment-kpis"><span><b>${running}</b> coletando</span><span><b>${ready}</b> prontos para leitura</span><span><b>${decided}</b> decididos</span><span class="${unlinked ? 'attention' : ''}"><b>${unlinked}</b> aprendizados sem vínculo</span></div>
     <div class="experiment-grid">${experiments.map((experiment) => `<article class="experiment-card" data-open-experiment="${escapeHtml(experiment.experiment_id)}" role="button" tabindex="0">
       <div class="experiment-card-head"><div><p class="micro">${escapeHtml(experiment.experiment_id)} · ${escapeHtml(experiment.system_ref)}</p><h3>${escapeHtml(experiment.name)}</h3></div>${badge(experiment.status, experiment.status === 'decided' ? 'good' : experiment.status === 'running' ? 'neutral' : experiment.status === 'ready-for-read' ? 'warn' : tone(experiment.status))}</div>
@@ -2277,7 +2277,7 @@ function renderRuns() {
     <td>${runsChainCell(entry)}</td>
     <td>${runsTraceBadge(entry)}<button class="table-action" data-canvas-jump-run="${escapeHtml(entry.selector_ref)}">trace →</button></td>
   </tr>`).join('');
-  return `<div class="section-heading"><div><p class="eyebrow">RASTRO</p><h2>Execuções</h2></div><p>Recibos de rotina e Run Records do ledger na mesma linha do tempo. Tudo reference-only ${prov('observado')} — o conteúdo continua privado.</p></div>
+  return `<div class="section-heading"><div><p class="eyebrow">Rastro</p><h2>Execuções</h2></div><p>Recibos de rotina e Run Records do ledger na mesma linha do tempo. Tudo reference-only ${prov('observado')} — o conteúdo continua privado.</p></div>
     ${issues}
     ${runsKpis(visible)}
     ${runsFilterBar(visible.length, total)}
@@ -2298,7 +2298,7 @@ function renderRuns() {
 
 function renderGovernance() {
   const grants = state.model.routines.flatMap((routine) => routine.access.map((access) => ({ ...access, routine })));
-  return `<div class="section-heading"><div><p class="eyebrow">AUTORIDADE</p><h2>Governança de acesso</h2></div><p>Revogação bloqueia Runs futuros. Ela não apaga um contexto já consumido.</p></div><div class="object-grid">${grants.map(({ routine, ...access }) => {
+  return `<div class="section-heading"><div><p class="eyebrow">Autoridade</p><h2>Governança de acesso</h2></div><p>Revogação bloqueia Runs futuros. Ela não apaga um contexto já consumido.</p></div><div class="object-grid">${grants.map(({ routine, ...access }) => {
     const grantId = access.grant_ref.replace(/^access-grant:/, '');
     const revoke = access.grant_status === 'granted' && access.revocation_effect === 'future-only'
       ? `<button class="secondary-action" data-revoke-grant="${escapeHtml(grantId)}">Revogar acesso futuro</button>` : '';
@@ -2308,7 +2308,7 @@ function renderGovernance() {
 
 function renderHealth() {
   const rows = state.model.routines.map((routine) => ({ name: routine.name, reason: routine.health_reason_code, binding: routine.binding.auth_status }));
-  return `<div class="section-heading"><div><p class="eyebrow">READBACK</p><h2>Saúde operacional</h2></div><p>Estado derivado de arquivos canônicos, nunca de um painel editorial paralelo.</p></div><div class="health-list">${rows.map((row) => `<article><span class="health-dot ${tone(row.reason)}"></span><div><h3>${escapeHtml(row.name)}</h3><p>${escapeHtml(label(row.reason))}</p></div><code>${escapeHtml(row.binding)}</code></article>`).join('')}${state.model.issues.map((issue) => `<article><span class="health-dot bad"></span><div><h3>${escapeHtml(label(issue.reason_code))}</h3><p>${escapeHtml(issue.ref)}</p></div></article>`).join('')}</div><div class="cache-note"><strong>Índice reconstruível</strong><p>Este V0 não mantém banco nem cache persistente. Cada atualização recompila contratos, bindings, estado e recibos locais.</p></div>`;
+  return `<div class="section-heading"><div><p class="eyebrow">Readback</p><h2>Saúde operacional</h2></div><p>Estado derivado de arquivos canônicos, nunca de um painel editorial paralelo.</p></div><div class="health-list">${rows.map((row) => `<article><span class="health-dot ${tone(row.reason)}"></span><div><h3>${escapeHtml(row.name)}</h3><p>${escapeHtml(label(row.reason))}</p></div><code>${escapeHtml(row.binding)}</code></article>`).join('')}${state.model.issues.map((issue) => `<article><span class="health-dot bad"></span><div><h3>${escapeHtml(label(issue.reason_code))}</h3><p>${escapeHtml(issue.ref)}</p></div></article>`).join('')}</div><div class="cache-note"><strong>Índice reconstruível</strong><p>Este V0 não mantém banco nem cache persistente. Cada atualização recompila contratos, bindings, estado e recibos locais.</p></div>`;
 }
 
 function renderSociety() {
@@ -2369,7 +2369,7 @@ function renderSocietyCatalog(catalog) {
     ['validation', 'Em validação', catalog.counts.validation],
   ].map(([value, copy, count]) => `<button type="button" class="society-filter${state.society.filter === value ? ' active' : ''}" data-society-filter="${value}">${copy} <b>${count}</b></button>`).join('');
   return `<section class="society-catalog">
-    <header class="society-hero"><div><p class="eyebrow">ACERVO EXCLUSIVO DA REDE</p><h2>Society</h2><p>Membros têm acesso aos Sistemas e capacidades que a INEVITA usa de verdade. Você implanta no seu Cérebro, usa no trabalho real e ajuda a validar o que entra na rede.</p></div><div class="society-counts"><span><b>${catalog.counts.validated}</b><small>validados</small></span><span><b>${catalog.counts.validation}</b><small>com acesso antecipado</small></span></div></header>
+    <header class="society-hero"><div><p class="eyebrow">Acervo exclusivo da rede</p><h2>Society</h2><p>Membros têm acesso aos Sistemas e capacidades que a INEVITA usa de verdade. Você implanta no seu Cérebro, usa no trabalho real e ajuda a validar o que entra na rede.</p></div><div class="society-counts"><span><b>${catalog.counts.validated}</b><small>validados</small></span><span><b>${catalog.counts.validation}</b><small>com acesso antecipado</small></span></div></header>
     <div class="society-boundary"><span>Circula</span><b>Protocolo · Capability · versão · prova agregada</b><span>Permanece local</span><b>Fontes · contexto · outputs · decisões</b></div>
     <div class="society-toolbar"><label><span>Buscar no acervo</span><input type="search" data-society-search value="${escapeHtml(state.society.query)}" placeholder="Resultado, nome ou publisher" autocomplete="off"></label><div class="society-filters" aria-label="Estado de publicação">${filters}</div></div>
     <div class="society-results"><span>${visible.length} ${visible.length === 1 ? 'capacidade disponível' : 'capacidades disponíveis'}</span><small>O catálogo é local; instalar nunca envia seu contexto para a Society.</small></div>
@@ -2405,7 +2405,7 @@ function societyCompatibilityCopy(status) {
 function societyCompatibilityPanel(system) {
   const compatibility = system.compatibility;
   if (!compatibility) {
-    return `<section class="society-compatibility"><p class="eyebrow">COMPATIBILIDADE LOCAL</p><h3>Contrato insuficiente</h3><p>Este pacote precisa publicar o System Contract antes de comparar Fontes.</p></section>`;
+    return `<section class="society-compatibility"><p class="eyebrow">Compatibilidade local</p><h3>Contrato insuficiente</h3><p>Este pacote precisa publicar o System Contract antes de comparar Fontes.</p></section>`;
   }
   const copy = societyCompatibilityCopy(compatibility.status);
   const roles = compatibility.roles.map((role) => {
@@ -2418,7 +2418,7 @@ function societyCompatibilityPanel(system) {
     return `<li><span class="compatibility-dot ${escapeHtml(roleCopy.tone)}"></span><div><b>${escapeHtml(role.role)}</b><small>${escapeHtml(sourceLine)}</small></div><em>${escapeHtml(roleCopy.label)}</em></li>`;
   }).join('');
   return `<section class="society-compatibility" data-compatibility-status="${escapeHtml(compatibility.status)}">
-    <p class="eyebrow">COMPATIBILIDADE LOCAL</p>
+    <p class="eyebrow">Compatibilidade local</p>
     <div class="society-compatibility-head"><h3>${escapeHtml(copy.label)}</h3><span class="compatibility-dot ${escapeHtml(copy.tone)}"></span></div>
     <p>${escapeHtml(copy.detail)}</p>
     <ul>${roles}</ul>
@@ -2452,14 +2452,14 @@ function renderSocietyDetail(system) {
     <button type="button" class="society-back" data-society-back>← Voltar ao catálogo</button>
     <header class="society-detail-hero"><div class="society-detail-identity">${systemIdentity(system, 'large')}<div><p class="micro">${escapeHtml(system.release.channel)} · v${escapeHtml(system.release.version)}</p><h2>${escapeHtml(system.name)}</h2><p>${escapeHtml(system.result)}</p></div></div><div class="society-detail-state">${societyStatus(system)}<span>${escapeHtml(system.installation_status === 'installed' ? 'Instalado neste Cérebro' : 'Não instalado')}</span></div></header>
     <div class="society-detail-layout"><main>
-      <section class="society-detail-section"><p class="eyebrow">PROMESSA CONTRATADA</p><h3>O que muda no trabalho</h3><dl><div><dt>Resultado</dt><dd>${escapeHtml(system.result)}</dd></div><div><dt>Primeiro valor</dt><dd>${escapeHtml(system.first_value)}</dd></div><div><dt>Régua</dt><dd>${escapeHtml(system.setpoint)}</dd></div></dl></section>
+      <section class="society-detail-section"><p class="eyebrow">Promessa contratada</p><h3>O que muda no trabalho</h3><dl><div><dt>Resultado</dt><dd>${escapeHtml(system.result)}</dd></div><div><dt>Primeiro valor</dt><dd>${escapeHtml(system.first_value)}</dd></div><div><dt>Régua</dt><dd>${escapeHtml(system.setpoint)}</dd></div></dl></section>
       ${societyCompatibilityPanel(system)}
-      <section class="society-detail-section"><p class="eyebrow">ANTES DE INSTALAR</p><h3>O que este Sistema precisa</h3><ul class="society-requirements">${societyRequirementList(system)}</ul></section>
-      <section class="society-detail-section"><p class="eyebrow">AUTORIDADE E PRIVACIDADE</p><h3>O que ele pode fazer</h3><div class="society-permissions"><span><i>${system.privacy.connects_sources_automatically ? '×' : '✓'}</i>Não conecta Fontes sozinho</span><span><i>${system.privacy.writes_external_systems_automatically ? '×' : '✓'}</i>Não escreve no CRM sozinho</span><span><i>${system.privacy.requires_source_by_source_consent ? '✓' : '×'}</i>Consentimento Fonte a Fonte</span><span><i>${system.requirements.human_approval_before_external_write ? '✓' : '×'}</i>Aprovação humana antes de escrever fora</span></div></section>
+      <section class="society-detail-section"><p class="eyebrow">Antes de instalar</p><h3>O que este Sistema precisa</h3><ul class="society-requirements">${societyRequirementList(system)}</ul></section>
+      <section class="society-detail-section"><p class="eyebrow">Autoridade e privacidade</p><h3>O que ele pode fazer</h3><div class="society-permissions"><span><i>${system.privacy.connects_sources_automatically ? '×' : '✓'}</i>Não conecta Fontes sozinho</span><span><i>${system.privacy.writes_external_systems_automatically ? '×' : '✓'}</i>Não escreve no CRM sozinho</span><span><i>${system.privacy.requires_source_by_source_consent ? '✓' : '×'}</i>Consentimento Fonte a Fonte</span><span><i>${system.requirements.human_approval_before_external_write ? '✓' : '×'}</i>Aprovação humana antes de escrever fora</span></div></section>
     </main><aside>
       ${societyInstallPanel(system)}
-      <section class="society-proof"><p class="eyebrow">PROVA DA REDE</p><h3>${system.availability === 'validated' ? 'Validação concluída' : 'Ainda em validação'}</h3><div><span><b>${validation.verified_real_cycles}</b><small>de ${validation.required_real_cycles} ciclos reais</small></span><span><b>${validation.verified_distinct_member_brains}</b><small>de ${validation.required_distinct_member_brains} Cérebros</small></span></div><ul><li class="${validation.requires_eval_pass ? '' : 'muted'}">Eval precisa passar</li><li class="${validation.requires_repeat_use ? '' : 'muted'}">Uso repetido é obrigatório</li><li class="${validation.requires_human_approval ? '' : 'muted'}">Julgamento humano é obrigatório</li></ul></section>
-      <section class="society-publisher-card"><p class="eyebrow">PUBLICAÇÃO</p><h3>${escapeHtml(publisher?.display_name || 'Publisher não publicado')}</h3><p>${publisher ? `Identidade declarada por ${escapeHtml(publisherKindLabel(publisher.kind))} no Experience Manifest.` : 'O pacote ainda não publicou um Experience Manifest. O Cockpit usa uma identidade neutra e não inventa autoria.'}</p><code>${escapeHtml(system.package_ref)}</code></section>
+      <section class="society-proof"><p class="eyebrow">Prova da rede</p><h3>${system.availability === 'validated' ? 'Validação concluída' : 'Ainda em validação'}</h3><div><span><b>${validation.verified_real_cycles}</b><small>de ${validation.required_real_cycles} ciclos reais</small></span><span><b>${validation.verified_distinct_member_brains}</b><small>de ${validation.required_distinct_member_brains} Cérebros</small></span></div><ul><li class="${validation.requires_eval_pass ? '' : 'muted'}">Eval precisa passar</li><li class="${validation.requires_repeat_use ? '' : 'muted'}">Uso repetido é obrigatório</li><li class="${validation.requires_human_approval ? '' : 'muted'}">Julgamento humano é obrigatório</li></ul></section>
+      <section class="society-publisher-card"><p class="eyebrow">Publicação</p><h3>${escapeHtml(publisher?.display_name || 'Publisher não publicado')}</h3><p>${publisher ? `Identidade declarada por ${escapeHtml(publisherKindLabel(publisher.kind))} no Experience Manifest.` : 'O pacote ainda não publicou um Experience Manifest. O Cockpit usa uma identidade neutra e não inventa autoria.'}</p><code>${escapeHtml(system.package_ref)}</code></section>
     </aside></div>
     <div class="boundary-note"><b>Catálogo ≠ Cérebro compartilhado</b>A Society distribui contratos, capacidade e atualizações. Seu contexto, outputs e julgamentos permanecem nesta empresa.</div>
   </section>`;
@@ -2651,7 +2651,7 @@ function caseDetail() {
 }
 
 function renderCases() {
-  return `<div class="section-heading"><div><p class="eyebrow">MARTELO HUMANO NA FONTE CANÔNICA</p><h2>Decisões</h2></div><p>O Console prepara o caso — item, evidência com proveniência e o diff exato. Quem decide é você; o registro vai para o vault com recibo e reversão.</p></div>
+  return `<div class="section-heading"><div><p class="eyebrow">Martelo humano na Fonte canônica</p><h2>Decisões</h2></div><p>O Console prepara o caso — item, evidência com proveniência e o diff exato. Quem decide é você; o registro vai para o vault com recibo e reversão.</p></div>
     ${state.cases.detail ? caseDetail() : caseList()}`;
 }
 
@@ -3067,10 +3067,10 @@ async function renderKnowledgePanel() {
     const inspector = $('#canvas-inspector');
     if (!inspector || state.view !== 'canvas' || state.canvas.scope !== 'brain') return;
     const maxDomain = Math.max(1, ...knowledge.domains.map((domain) => domain.count));
-    inspector.innerHTML = `<p class="micro">MEMÓRIA SEMÂNTICA · DIAGNÓSTICO</p><h3>Notas e conexões</h3>
+    inspector.innerHTML = `<p class="micro">Memória semântica · Diagnóstico</p><h3>Notas e conexões</h3>
       <div class="canvas-inspector-state"><span>${knowledge.total_notes} notas · 01-nucleo-privado</span></div>
-      <div class="knowledge-block"><p class="micro">DOMÍNIOS</p>${knowledge.domains.map((domain) => `<div class="knowledge-domain"><span>${escapeHtml(domain.name)}</span><i style="--w:${Math.round((domain.count / maxDomain) * 100)}%"></i><b>${domain.count}</b></div>`).join('')}</div>
-      <div class="knowledge-block"><p class="micro">MAIS LINKADAS</p>${knowledge.most_linked.map((note) => `<button type="button" class="knowledge-note" data-copy-ref="${escapeHtml(note.path)}" title="Copiar caminho"><strong>${escapeHtml(note.title)}</strong><small>${escapeHtml(note.domain)} · ${note.count}←</small></button>`).join('') || '<p class="muted">Nenhum wikilink encontrado.</p>'}</div>
+      <div class="knowledge-block"><p class="micro">Domínios</p>${knowledge.domains.map((domain) => `<div class="knowledge-domain"><span>${escapeHtml(domain.name)}</span><i style="--w:${Math.round((domain.count / maxDomain) * 100)}%"></i><b>${domain.count}</b></div>`).join('')}</div>
+      <div class="knowledge-block"><p class="micro">Mais linkadas</p>${knowledge.most_linked.map((note) => `<button type="button" class="knowledge-note" data-copy-ref="${escapeHtml(note.path)}" title="Copiar caminho"><strong>${escapeHtml(note.title)}</strong><small>${escapeHtml(note.domain)} · ${note.count}←</small></button>`).join('') || '<p class="muted">Nenhum wikilink encontrado.</p>'}</div>
       <p class="section-help">Diagnóstico secundário da memória — o cérebro começa pelos resultados que sabe produzir, não pela contagem de notas.</p>`;
   } catch { /* painel opcional — o Canvas funciona sem ele */ }
 }
@@ -3242,7 +3242,7 @@ async function mountCanvasView() {
     }
     $('#canvas-origin').innerHTML = graph.trace_origin
       ? `<span>${graph.run?.mode ? escapeHtml(label(graph.run.mode).toUpperCase()) : graph.trace_origin === 'recorded' ? 'TRACE V1' : 'TRACE RECONSTRUÍDO'}</span><b>${escapeHtml(graph.run?.chain_id ? `${graph.run.chain_id} · ${graph.trace_events} eventos` : graph.trace_origin === 'recorded' ? `${graph.trace_events} eventos` : 'granularidade limitada')}</b>`
-      : `<span>CONTRATO</span><b>${graph.nodes.length} nós · ${graph.edges.length} arestas</b>`;
+      : `<span>Contrato</span><b>${graph.nodes.length} nós · ${graph.edges.length} arestas</b>`;
     $('#canvas-list').innerHTML = canvasList(graph);
     const pendingFocus = state.canvas.pendingFocus;
     state.canvas.pendingFocus = null;
@@ -3346,7 +3346,7 @@ function openDrawer(routineId) {
   state.selectedExperiment = null;
   const access = routine.access.map((item) => `<div class="access-item"><div><strong>${escapeHtml(item.source_ref)}</strong><span>${escapeHtml(item.action)} · ${escapeHtml(item.requested_mode)}</span></div>${badge(item.assurance, item.assurance === 'runtime-enforced' ? 'good' : 'neutral')}<small>${escapeHtml(label(item.revocation_effect))}</small></div>`).join('') || '<p class="muted">Sem Access Grants declarados.</p>';
   const receipts = routine.receipts.map((receipt) => `<div class="receipt-item"><span class="timeline-dot ${tone(receipt.status)}"></span><div><strong>${escapeHtml(label(receipt.status))} · ${escapeHtml(receipt.trigger)}</strong><span>${fmtDate(receipt.completed_at)} · ${escapeHtml(receipt.reason_code)}</span><code>${escapeHtml(receipt.receipt_ref)}</code>${receipt.output_ref ? `<code>output: ${escapeHtml(receipt.output_ref)}</code>` : ''}</div></div>`).join('') || '<p class="muted">Nenhuma execução registrada.</p>';
-  const migration = routine.migration ? `<div class="migration-box ${routine.migration.status === 'awaiting-legacy-pause' ? 'attention' : ''}"><p class="micro">MIGRAÇÃO DE AGENDA</p><strong>${escapeHtml(label(routine.migration.status))}</strong><p>${escapeHtml(routine.migration.source.schedule_summary)}</p><small>Fonte: ${escapeHtml(routine.migration.source.kind)} · o Console não pausa esse fornecedor sozinho.</small></div>` : '';
+  const migration = routine.migration ? `<div class="migration-box ${routine.migration.status === 'awaiting-legacy-pause' ? 'attention' : ''}"><p class="micro">Migração de agenda</p><strong>${escapeHtml(label(routine.migration.status))}</strong><p>${escapeHtml(routine.migration.source.schedule_summary)}</p><small>Fonte: ${escapeHtml(routine.migration.source.kind)} · o Console não pausa esse fornecedor sozinho.</small></div>` : '';
   $('#drawer-content').innerHTML = `<div class="drawer-head"><p class="eyebrow">ROTINA · v${escapeHtml(routine.version)}</p><h2>${escapeHtml(routine.name)}</h2>${badge(routine.health_reason_code)}</div>${migration}
     <section class="drawer-section"><h3>Contrato operacional</h3><dl><div><dt>Agenda</dt><dd>${escapeHtml(routine.schedule)}</dd></div>${routine.preparation ? `<div><dt>Preparação</dt><dd>${escapeHtml(routine.preparation.executable || 'binding ausente')} → <code>${escapeHtml(routine.preparation.output_ref)}</code></dd></div>` : ''}<div><dt>Executor</dt><dd>${escapeHtml(routine.binding.adapter)} · ${escapeHtml(routine.binding.requested_model)}</dd></div><div><dt>Modelo</dt><dd>Solicitado, não verificado pelo provider</dd></div><div><dt>Permissão</dt><dd>${escapeHtml(routine.permission_mode)}</dd></div><div><dt>Prompt ref.</dt><dd><code>${escapeHtml(routine.prompt_ref)}</code></dd></div><div><dt>Destino</dt><dd><code>${escapeHtml(routine.destination.kind)}:${escapeHtml(routine.destination.ref)}</code></dd></div></dl></section>
     <section class="drawer-section"><h3>Contexto e garantia</h3><p class="section-help">A interface mostra referências e a garantia real. Ela não abre o conteúdo da Fonte.</p>${access}</section>
@@ -3467,7 +3467,7 @@ function contextMarkup(context) {
   const snapshot = context.context_snapshot;
   const accesses = snapshot.accesses.map((access) => `<article class="context-access"><div class="object-card-top">${badge(access.assurance, access.assurance === 'runtime-enforced' ? 'good' : 'neutral')}<code>${escapeHtml(access.source_ref.role)}</code></div><h3>${escapeHtml(access.source_ref.id)}</h3><dl><div><dt>Seleção</dt><dd>${escapeHtml(access.query)}</dd></div><div><dt>Janela</dt><dd>${escapeHtml(access.window)}</dd></div><div><dt>Frescor</dt><dd>${escapeHtml(access.freshness_marker || 'não informado')}</dd></div></dl><div class="ref-list">${access.selected_refs.map((ref) => `<code>${escapeHtml(ref)}</code>`).join('')}</div></article>`).join('');
   const gaps = snapshot.gaps.length
-    ? `<div class="context-gaps"><p class="micro">LACUNAS</p>${snapshot.gaps.map((gap) => `<code>${escapeHtml(gap.source_role)} · ${escapeHtml(gap.reason_code)}</code>`).join('')}</div>`
+    ? `<div class="context-gaps"><p class="micro">Lacunas</p>${snapshot.gaps.map((gap) => `<code>${escapeHtml(gap.source_role)} · ${escapeHtml(gap.reason_code)}</code>`).join('')}</div>`
     : '<p class="good-note">Nenhuma lacuna de Fonte registrada.</p>';
   return `<div class="context-summary"><span><b>${snapshot.accesses.length}</b> fontes selecionadas</span><span><b>${snapshot.gaps.length}</b> lacunas</span><span><b>v${escapeHtml(snapshot.retrieval_version)}</b> retrieval</span></div><div class="context-grid">${accesses}</div>${gaps}<div class="boundary-note"><b>Snapshot reference-only</b>O ledger guarda hash, ponteiros, filtros, janela, frescor e garantia. A seleção é auditada; somente uma garantia runtime-enforced provaria bloqueio preventivo. O artefato privado não foi aberto nesta tela.</div>`;
 }
@@ -3486,7 +3486,7 @@ async function openContextDrawer(receiptId) {
   state.selectedRoutine = null;
   state.selectedJudgment = receiptId;
   state.selectedExperiment = null;
-  $('#drawer-content').innerHTML = '<div class="drawer-head"><p class="eyebrow">RUN RECORD V2</p><h2>Contexto selecionado</h2></div><div id="context-slot"><p class="muted">Lendo referências locais…</p></div>';
+  $('#drawer-content').innerHTML = '<div class="drawer-head"><p class="eyebrow">Run record v2</p><h2>Contexto selecionado</h2></div><div id="context-slot"><p class="muted">Lendo referências locais…</p></div>';
   $('#drawer').classList.add('open');
   $('#drawer').setAttribute('aria-hidden', 'false');
   await loadContext(receiptId, $('#context-slot'));
@@ -3502,7 +3502,7 @@ async function openJudgment(receiptId) {
   try {
     const detail = await getJson(`/api/runs/${receiptId}/output`);
     const current = detail.judgment.summary;
-    $('#drawer-content').innerHTML = `<div class="drawer-head"><p class="eyebrow">OUTPUT PRIVADO</p><h2>${escapeHtml(detail.receipt.routine_id)}</h2>${badge(current.status === 'pending' ? 'pending' : current.verdict)}</div>
+    $('#drawer-content').innerHTML = `<div class="drawer-head"><p class="eyebrow">Output privado</p><h2>${escapeHtml(detail.receipt.routine_id)}</h2>${badge(current.status === 'pending' ? 'pending' : current.verdict)}</div>
       <div class="boundary-note"><b>Leitura local explícita</b>Este conteúdo não entrou no recibo, no read model ou na INEVITA. Abrir não executou modelo.</div>
       <section class="drawer-section"><div class="output-heading"><h3>Resultado</h3><span>${detail.output.bytes} bytes</span></div><pre class="private-output">${escapeHtml(detail.output.content)}</pre></section>
       ${detail.context_available ? `<section class="drawer-section"><div class="output-heading"><h3>Contexto selecionado</h3><button class="table-action" data-load-context="${escapeHtml(receiptId)}">Abrir Run Record V2 →</button></div><div id="context-slot"></div></section>` : ''}
@@ -3567,7 +3567,7 @@ async function performCorrectionAction(action) {
       const comparison = await getJson(`/api/runs/${state.selectedJudgment}/comparison`);
       const slot = $('#comparison-slot');
       if (!slot) return;
-      slot.innerHTML = `<div class="comparison-grid"><article><p class="micro">BASELINE</p><pre class="private-output">${escapeHtml(comparison.baseline.output.content)}</pre></article><article><p class="micro">NOVO RUN</p><pre class="private-output">${escapeHtml(comparison.candidate.output.content)}</pre></article></div>
+      slot.innerHTML = `<div class="comparison-grid"><article><p class="micro">Baseline</p><pre class="private-output">${escapeHtml(comparison.baseline.output.content)}</pre></article><article><p class="micro">Novo Run</p><pre class="private-output">${escapeHtml(comparison.candidate.output.content)}</pre></article></div>
         <div class="boundary-note"><b>Comparação local</b>Abrir esta comparação não chamou modelo e não colocou os outputs no read model.</div>`;
     } catch (error) {
       toast(label(error.message), 'bad');
