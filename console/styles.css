@@ -77,6 +77,10 @@
 
 * { box-sizing: border-box; }
 
+/* Sprite de ícones: o atributo hidden não esconde <svg> (é elemento SVG, não HTML),
+   então sem isto ele ocupa 300x150 no topo da página. */
+svg[hidden] { position: absolute; width: 0; height: 0; overflow: hidden; }
+
 body {
   margin: 0;
   min-height: 100vh;
