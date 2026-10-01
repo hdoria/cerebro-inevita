@@ -139,3 +139,17 @@ O e-mail fica fora das notas e do Git. O que sai da máquina continua sendo só 
 7. **Citação = literal**, entre aspas, com timestamp. Nunca parafraseie como se fosse quote.
 8. **Telemetria não é contribuição.** Ping leva evento e metadados técnicos permitidos, nunca conteúdo.
 9. **O cérebro sugere, o dono decide.** Preparar contribuição, aprovar e enviar são três consentimentos separados; sem endpoint oficial, não simule envio.
+
+## Agent skills
+
+### Issue tracker
+
+Issues e specs deste fork vivem nas GitHub Issues do repo privado `hdoria/hugo-os-lab`, nunca no fork público. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Rótulos padrão: needs-triage, needs-info, ready-for-agent, ready-for-human, wontfix. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context; o glossário do domínio hoje é o `GLOSSARIO.md`. See `docs/agents/domain.md`.
