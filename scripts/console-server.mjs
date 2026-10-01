@@ -3,7 +3,7 @@
 import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { createServer } from 'node:http';
-import { dirname, resolve, sep } from 'node:path';
+import { dirname, isAbsolute, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   confirmLegacySchedulePaused,
@@ -18,7 +18,7 @@ import {
 import { buildConsoleReadModel, listConsoleSystems, recognizeConsoleBrain } from './lib/console-read-model.mjs';
 import { buildSkillReadModel } from './lib/skill-read-model.mjs';
 import { buildSocietyCatalogReadModel } from './lib/society-catalog-read-model.mjs';
-import { latestRunRecords } from './lib/system-protocol.mjs';
+import { latestRunRecords, layout } from './lib/system-protocol.mjs';
 import { saveCanvasLayout } from './lib/canvas-layout-runtime.mjs';
 import {
   buildBrainGraph,
@@ -52,16 +52,47 @@ import {
   checkLatestBrainRelease,
 } from './lib/brain-update-center.mjs';
 
-// Índice derivado do conhecimento: varre SOMENTE 01-nucleo-privado (fosso, baixo
-// risco), nunca 02-dados-terceiros. Reconstruível a cada chamada; não cria verdade.
-function knowledgeIndex(root) {
-  const base = resolve(root, '01-nucleo-privado');
+// Caminhos que o Console lê para montar mapa e memória. O padrão é a estrutura da
+// INEVITA; um vault com outra organização declara os seus em .cerebro/layout.json
+// (knowledgeRoot, conceptNotes, decisionNotes, companyMapDomains). Todo caminho
+// configurado precisa ficar dentro do Cérebro.
+function insideBrain(root, ref) {
+  if (typeof ref !== 'string' || !ref || isAbsolute(ref)) return false;
+  const target = resolve(root, ref);
+  const brainRoot = resolve(root);
+  return target === brainRoot || target.startsWith(`${brainRoot}${sep}`);
+}
+
+function validCompanyMapDomains(root, domains) {
+  if (!Array.isArray(domains) || !domains.length) return false;
+  return domains.every((domain) => typeof domain?.id === 'string' && typeof domain.name === 'string'
+    && Array.isArray(domain.entries) && domain.entries.every((entry) => typeof entry?.id === 'string'
+      && typeof entry.name === 'string' && Array.isArray(entry.refs) && entry.refs.every((ref) => insideBrain(root, ref))));
+}
+
+function consolePaths(root) {
+  let configured = {};
+  try { configured = layout(root); } catch { configured = {}; }
+  const pick = (key, fallback) => (insideBrain(root, configured[key]) ? configured[key] : fallback);
+  return {
+    knowledgeRoot: pick('knowledgeRoot', '01-nucleo-privado'),
+    conceptNotes: pick('conceptNotes', '01-nucleo-privado/conceitos'),
+    decisionNotes: pick('decisionNotes', '01-nucleo-privado/decisoes'),
+    companyMapDomains: validCompanyMapDomains(root, configured.companyMapDomains) ? configured.companyMapDomains : COMPANY_MAP_SPEC,
+  };
+}
+
+// Índice derivado do conhecimento: varre SOMENTE a raiz de conhecimento (por padrão
+// 01-nucleo-privado), nunca 02-dados-terceiros. Reconstruível a cada chamada; não cria verdade.
+export function knowledgeIndex(root) {
+  const knowledgeRoot = consolePaths(root).knowledgeRoot;
+  const base = resolve(root, knowledgeRoot);
   const files = [];
   const walk = (dir) => {
     let entries;
     try { entries = readdirSync(dir, { withFileTypes: true }); } catch { return; }
     for (const entry of entries) {
-      if (entry.name.startsWith('.')) continue;
+      if (entry.name.startsWith('.') || entry.name === 'node_modules') continue;
       const full = resolve(dir, entry.name);
       if (entry.isDirectory()) walk(full);
       else if (entry.isFile() && entry.name.endsWith('.md')) files.push(full);
@@ -88,7 +119,7 @@ function knowledgeIndex(root) {
     .filter(([slug]) => slugs.has(slug))
     .sort((left, right) => right[1] - left[1])
     .slice(0, 12)
-    .map(([slug, count]) => ({ title: slug, count, domain: slugs.get(slug).domain, path: `01-nucleo-privado/${slugs.get(slug).relative}` }));
+    .map(([slug, count]) => ({ title: slug, count, domain: slugs.get(slug).domain, path: join(knowledgeRoot, slugs.get(slug).relative) }));
   const domainList = [...domains.entries()].sort((left, right) => right[1] - left[1]).slice(0, 10)
     .map(([name, count]) => ({ name, count }));
   return { total_notes: files.length, domains: domainList, most_linked: top };
@@ -769,7 +800,7 @@ export function companyMapModel(root, { model, sources, round, contextGaps = 0 }
     ['routines', ['rotina', 'rotinas']],
     ['sources', ['Fonte', 'Fontes']],
   ]);
-  const domains = COMPANY_MAP_SPEC.map((domain) => ({
+  const domains = consolePaths(root).companyMapDomains.map((domain) => ({
     id: domain.id,
     name: domain.name,
     purpose: domain.purpose,
@@ -1038,13 +1069,13 @@ function anatomyModel(root) {
   // identidade: âncoras + decisões recentes (documentos humanos datados)
   let anchors = [];
   try {
-    anchors = readdirSync(resolve(root, '01-nucleo-privado/conceitos'))
+    anchors = readdirSync(resolve(root, consolePaths(root).conceptNotes))
       .filter((name) => name.endsWith('.md') && !name.startsWith('_') && !name.includes('excalidraw'))
       .map((name) => name.slice(0, -3));
   } catch { anchors = []; }
   let decisions = [];
   try {
-    decisions = readdirSync(resolve(root, '01-nucleo-privado/decisoes'))
+    decisions = readdirSync(resolve(root, consolePaths(root).decisionNotes))
       .filter((name) => /^\d{4}-\d{2}-\d{2}/.test(name) && name.endsWith('.md'))
       .sort().slice(-5).reverse()
       .map((name) => ({ date: name.slice(0, 10), title: name.slice(11, -3).replaceAll('-', ' ') }));
