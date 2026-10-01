@@ -229,6 +229,15 @@ function summaryCards() {
   ].map(summaryCard).join('');
 }
 
+function vaultSummaryCards(vault) {
+  return [
+    ['Projetos ativos', vault.projects.active, 'status Active no frontmatter', 'signal'],
+    ['Parados', vault.projects.stale_total, `sem update há ${vault.projects.stale_days}+ dias`, 'decision', true],
+    ['Áreas', vault.areas.length, 'notas type Area', 'play'],
+    ['Inbox', vault.inbox?.count ?? 0, 'capturas esperando triagem', 'receipt', true],
+  ].map(summaryCard).join('');
+}
+
 // O card só chama atenção quando o número pede ação humana — o zero não grita.
 function summaryCard([title, value, description, icon, actionable]) {
   return `<article class="summary-card${actionable && Number(value) > 0 ? ' is-actionable' : ''}"><small><span class="summary-icon ${icon}"></span>${title}</small><strong>${value}</strong><p>${description}</p></article>`;
@@ -1500,7 +1509,33 @@ function decisionCategory(category) {
   return DECISION_CATEGORIES[category] || category;
 }
 
+// Vault de notas tipadas (layout.json com `vault`): o "agora" é foco, daily,
+// projetos parados e inbox, não rotinas do protocolo.
+function vaultList(items, emptyText) {
+  if (!items.length) return `<p class="muted">${escapeHtml(emptyText)}</p>`;
+  return `<div class="decision-list vault-list" role="list">${items.map((item, index) => `<div class="decision-row" role="listitem"><b>${index + 1}</b><div><strong>${escapeHtml(item.text)}</strong>${item.meta ? `<small>${escapeHtml(item.meta)}</small>` : ''}</div>${item.side ? `<span class="decision-age${item.late ? ' late' : ''}">${escapeHtml(item.side)}</span>` : '<span></span>'}</div>`).join('')}</div>`;
+}
+
+function renderVaultToday(vault) {
+  const daily = vault.daily;
+  const projects = vault.projects;
+  const focus = vaultList(vault.focus.items.map((text) => ({ text })), 'Nenhum foco declarado. Crie hot.md ou a seção "Foco agora" no home.md.');
+  const priorities = daily ? vaultList(daily.priorities.map((text) => ({ text })), 'A daily não tem seção "Prioridades".') : '<p class="muted">Nenhuma daily encontrada.</p>';
+  const stale = vaultList(projects.stale.map((project) => ({
+    text: project.title,
+    meta: project.updated ? `atualizado em ${project.updated}` : 'sem campo updated',
+    side: project.days === null ? '?' : `${project.days}d`,
+    late: (project.days ?? Infinity) >= 30,
+  })), 'Nenhum projeto ativo parado.');
+  return `<div class="section-heading"><div><p class="eyebrow">Agora</p><h2>O que está na mesa</h2></div><p>Lido do vault: foco, daily, projetos parados e inbox. Esta tela não escreve nada.</p></div>
+    <div class="today-block"><div class="subheading"><h3>Foco</h3><span>${escapeHtml(vault.focus.ref || 'sem fonte')}</span></div>${focus}</div>
+    <div class="today-block"><div class="subheading"><h3>${daily?.is_today ? 'Prioridades de hoje' : 'Prioridades da última daily'}</h3><span>${escapeHtml(daily?.ref || '')}</span></div>${priorities}</div>
+    <div class="today-block"><div class="subheading"><h3>Projetos parados</h3><span>${projects.stale_total} de ${projects.active} ativos sem update há ${projects.stale_days}+ dias</span></div>${stale}${projects.stale_total > projects.stale.length ? `<p class="muted">Mais ${projects.stale_total - projects.stale.length} na weekly review.</p>` : ''}</div>
+    ${vault.inbox ? `<div class="today-block"><div class="subheading"><h3>Inbox</h3><span>${escapeHtml(vault.inbox.ref)}</span></div><p class="muted">${vault.inbox.count ? `${vault.inbox.count} captura(s) esperando triagem.` : 'Inbox vazio.'}</p></div>` : ''}`;
+}
+
 function renderToday() {
+  if (state.vaultToday) return renderVaultToday(state.vaultToday);
   const ids = [...state.model.today.needs_attention, ...state.model.today.ready_to_work, ...state.model.today.active];
   const routines = ids.map((id) => state.model.routines.find((routine) => routine.routine_id === id)).filter(Boolean).filter((routine) => inActiveOperatingArea(systemOperatingArea(routine.system_ref)));
   const pending = visibleJudgments().filter((item) => item.judgment.status === 'pending');
@@ -1665,6 +1700,9 @@ function renderJudgments() {
 }
 
 function renderAreas() {
+  if (state.vaultToday?.areas?.length) {
+    return `<div class="section-heading"><div><p class="eyebrow">Responsabilidade</p><h2>Áreas</h2></div><p>Áreas do vault e quantos projetos ativos pertencem ou se relacionam a cada uma.</p></div><div class="object-grid">${state.vaultToday.areas.map((area) => `<article class="object-card" data-kind="area"><span class="object-index">${String(area.active_projects).padStart(2, '0')}</span><p class="micro">${escapeHtml(area.status || 'Área')}</p><h3>${escapeHtml(area.title)}</h3><p>${area.active_projects} projeto(s) ativo(s)</p><div class="ref-list"><code>${escapeHtml(area.ref)}</code></div></article>`).join('')}</div>`;
+  }
   return `<div class="section-heading"><div><p class="eyebrow">Responsabilidade operacional</p><h2>Áreas responsáveis</h2></div><p>Áreas declaram quem responde internamente. Funções empresariais classificam o trabalho no Launcher e na Society.</p></div><div class="object-grid">${state.model.areas.map((area) => `<article class="object-card" data-kind="area"><span class="object-index">${String(area.system_refs.length).padStart(2, '0')}</span><p class="micro">Área responsável</p><h3>${escapeHtml(area.name)}</h3><p>${area.system_refs.length} sistema(s) · ${area.routine_refs.length} rotina(s)</p><div class="ref-list">${area.system_refs.map((ref) => `<code>${escapeHtml(ref)}</code>`).join('')}</div></article>`).join('') || empty('Nenhuma área responsável declarada', 'Áreas aparecem quando Sistemas possuem contratos válidos.')}</div>`;
 }
 
@@ -2876,13 +2914,14 @@ function render() {
   if (!state.model) return;
   let [title, subtitle] = titles[state.view];
   if (state.view === 'system' && state.workspace?.data) title = state.workspace.data.system.name;
+  if (state.view === 'today' && state.vaultToday) subtitle = 'Foco, daily, projetos parados e inbox, lidos direto do vault.';
   document.body.dataset.currentView = state.view;
   $('#eyebrow').textContent = `company-brain // ${(viewGroups[state.view] || 'Operação').toLowerCase()}`;
   $('#page-title').textContent = title;
   $('#page-subtitle').textContent = subtitle;
   renderAreaSwitcher();
   const hidesSummary = ['activation', 'canvas', 'system', 'systems', 'skills', 'society'].includes(state.view) || state.view === 'anatomy';
-  $('#summary').innerHTML = hidesSummary ? '' : summaryCards();
+  $('#summary').innerHTML = hidesSummary ? '' : state.vaultToday ? vaultSummaryCards(state.vaultToday) : summaryCards();
   if (replay.playing) stopTraceReplay(false);
   if (state.canvas.controller) { state.canvas.controller.destroy(); state.canvas.controller = null; }
   if (state.canvas.stopParticles) { state.canvas.stopParticles(); state.canvas.stopParticles = null; }
@@ -3695,11 +3734,13 @@ async function performAction(action) {
 }
 
 async function loadModel() {
-  const [model, decisions] = await Promise.all([
+  const [model, decisions, vaultToday] = await Promise.all([
     getJson('/api/console'),
     getJson('/api/decisions').catch(() => null),
+    getJson('/api/vault-today').catch(() => null),
     loadCases(),
   ]);
+  state.vaultToday = vaultToday?.available ? vaultToday : null;
   state.model = model;
   if (!state.initialRouteResolved || (state.view === 'activation' && model.activation.complete)) {
     state.view = model.activation.complete ? 'today' : 'activation';

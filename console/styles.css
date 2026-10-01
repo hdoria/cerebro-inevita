@@ -1298,6 +1298,7 @@ button.brain-run-row:hover { background: color-mix(in srgb, var(--text) 1.8%, tr
   border-top: 1px solid var(--hairline);
 }
 .decision-row:first-child { border-top: 0; }
+.vault-list .decision-row strong { white-space: normal; }
 .decision-row > b { color: var(--text-3); font: 590 var(--fs-micro) var(--font-mono); font-variant-numeric: tabular-nums; }
 .decision-row strong { display: block; overflow: hidden; color: var(--text); font-size: var(--fs-body); font-weight: 520; text-overflow: ellipsis; white-space: nowrap; }
 .decision-row small { display: block; margin-top: 1px; color: var(--text-3); font-size: var(--fs-micro); }

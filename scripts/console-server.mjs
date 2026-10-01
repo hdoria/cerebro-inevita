@@ -19,6 +19,7 @@ import { buildConsoleReadModel, listConsoleSystems, recognizeConsoleBrain } from
 import { buildSkillReadModel } from './lib/skill-read-model.mjs';
 import { buildSocietyCatalogReadModel } from './lib/society-catalog-read-model.mjs';
 import { latestRunRecords, layout } from './lib/system-protocol.mjs';
+import { vaultToday } from './lib/vault-today.mjs';
 import { saveCanvasLayout } from './lib/canvas-layout-runtime.mjs';
 import {
   buildBrainGraph,
@@ -1506,6 +1507,13 @@ export function createConsoleServer({
       if (request.method === 'GET' && url.pathname === '/api/runs') {
         if (!exactEqual(cookies(request)[COOKIE_NAME], sessionToken)) throw new Error('session-required');
         send(response, 200, runsExplorerModel(brainRoot));
+        return;
+      }
+      if (request.method === 'GET' && url.pathname === '/api/vault-today') {
+        if (!exactEqual(cookies(request)[COOKIE_NAME], sessionToken)) throw new Error('session-required');
+        let configured = {};
+        try { configured = layout(brainRoot); } catch { configured = {}; }
+        send(response, 200, vaultToday(brainRoot, configured.vault));
         return;
       }
       if (request.method === 'GET' && url.pathname === '/api/decisions') {
