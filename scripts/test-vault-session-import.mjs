@@ -19,7 +19,7 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import {
-  existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync,
+  existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
@@ -582,6 +582,25 @@ try {
   assert.match(stable.out, /8 run record\(s\) v2 · 0 novo\(s\) · 8 já no ledger/,
     `depois de corrigir, a rodada seguinte não grava nada: ${stable.out}`);
   assert.equal(ledger(vaultRoot).length, 9, 'nenhuma linha nova nem removida depois da correção');
+
+  // ── 4c. pasta de sessões que desaparece é zero sessão, não "em dia" ───────────
+  // Se a pasta é apagada ou repontada no layout, o bloco deste importador sai do ledger:
+  // run importado é projeção do vault, e sem nota não há nada para sustentar.
+  const sessionsAway = `${sessions}-fora`;
+  renameSync(sessions, sessionsAway);
+  const gone = sync(vaultRoot, '--confirm');
+  assert.match(gone.out, /0 run record\(s\) v2 · 0 novo\(s\) · 8 retirada\(s\) · 0 já no ledger/,
+    `sem a pasta de sessões, as oito projeções são retiradas: ${gone.out}`);
+  assert.equal(gone.out.includes('o bloco deste importador no ledger já estava em dia'), false,
+    'pasta ausente não pode ser reportada como ledger em dia');
+  assert.deepEqual(ledger(vaultRoot).map((record) => JSON.stringify(record)), [foreign],
+    'só a linha da outra ferramenta continua no ledger');
+
+  renameSync(sessionsAway, sessions);
+  const restored = sync(vaultRoot, '--confirm');
+  assert.match(restored.out, /8 run record\(s\) v2 · 8 novo\(s\) · 0 já no ledger/,
+    `com a pasta de volta, as sessões voltam a ser importadas: ${restored.out}`);
+  assert.equal(ledger(vaultRoot).length, 9, 'o ledger volta ao estado anterior');
 
   // ── 5. PII é recusada, nunca gravada ───────────────────────────────────────────
   const piiNote = '2026-07-10-ingestao-ficha-123.456.789-09.md';

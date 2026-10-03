@@ -61,6 +61,9 @@ function main() {
   for (const item of report.ambiguous) {
     console.log(`rotina ambígua · ${item.routine_id} · já existe outra Rotina ${item.kind} escrevendo em ${report.journal_ref}`);
   }
+  for (const item of report.invalid_routines) {
+    console.log(`contrato de rotina ilegível · ${item.ref} · ${item.reason_code}`);
+  }
 
   // Motivos agrupados: 88 dailies não precisam de 88 linhas iguais, mas cada caso raro
   // precisa aparecer com o caminho.

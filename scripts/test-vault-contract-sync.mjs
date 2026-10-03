@@ -161,6 +161,17 @@ kind: mcp
 #
 `);
   write(join(vaultRoot, 'sistema', 'fontes', '_rascunho.md'), '---\ntype: DataSource\n---\n\n# Rascunho\n');
+  // Template não precisa morar na raiz do vault: qualquer segmento `templates/` é
+  // formulário do app, não declaração de fonte.
+  write(join(vaultRoot, 'sistema', 'templates', 'datasource.md'), `---
+type: DataSource
+source_id:
+nome:
+kind: mcp
+---
+
+#
+`);
 
   // Contrato de outra ferramenta: o compilador não é dono dele e nunca o apaga.
   const foreign = {
@@ -200,7 +211,7 @@ kind: mcp
   assert.match(dry.out, /simulação: 1 contrato\(s\) válido\(s\) · 2 nota\(s\) com erro/,
     'o resumo da simulação conta válidos e com erro, sem contar template nem rascunho');
   assert.equal(dry.out.includes('templates/datasource.md'), false,
-    'o template do type não é uma fonte declarada');
+    'o template do type não é uma fonte declarada, na raiz ou em subpasta');
   assert.equal(dry.out.includes('_rascunho.md'), false, 'rascunho prefixado com _ fica de fora');
 
   // ── 2. erro aponta nota, campo e motivo ─────────────────────────────────────────
@@ -268,6 +279,42 @@ kind: mcp
     'o conteúdo do contrato é idêntico na recompilação');
   assert.equal(statSync(join(vaultRoot, CONTRACTS, 'gmail.json')).mtimeMs, before,
     'o arquivo não é reescrito quando nada mudou');
+
+  // ── 5b. nota que passa a falhar mantém o último contrato bom, e o registro dele ─
+  // Validação quebrada não apaga o contrato que já funcionava: a nota existe, então o
+  // arquivo dela não é órfão. O registro precisa continuar listando esse arquivo com a
+  // nota de origem, senão ele vira órfão invisível e nunca sai quando a nota for apagada.
+  const notionNote = join(vaultRoot, 'sistema', 'fontes', 'notion.md');
+  const notionContract = join(vaultRoot, CONTRACTS, 'notion.json');
+  const registered = () => JSON.parse(readFileSync(join(vaultRoot, '.cerebro', 'compiled.json'), 'utf8'))
+    .files.map((entry) => entry.path);
+  write(notionNote, GMAIL_NOTE.replace('source_id: gmail', 'source_id: notion')
+    .replace('nome: Gmail do Hugo', 'nome: Notion do dono'));
+  sync(vaultRoot, '--confirm');
+  assert.equal(existsSync(notionContract), true, 'a fonte nova vira contrato');
+  assert.ok(registered().includes('.cerebro/contracts/sources/notion.json'),
+    'o registro lista o contrato gerado');
+
+  write(notionNote, GMAIL_NOTE.replace('source_id: gmail', 'source_id: notion')
+    .replace('nome: Gmail do Hugo', 'nome: Notion do dono')
+    .replace('sensibilidade: alta', 'sensibilidade: altissima'));
+  const brokenAgain = sync(vaultRoot, '--confirm');
+  assert.ok(brokenAgain.lines.includes('sistema/fontes/notion.md · sensibilidade · valor inválido; use baixa, media, alta, muito-alta'),
+    `a nota quebrada é reportada: ${brokenAgain.out}`);
+  assert.equal(existsSync(notionContract), true,
+    'o último contrato bom fica em disco até o dono corrigir a nota');
+  assert.ok(registered().includes('.cerebro/contracts/sources/notion.json'),
+    'o registro continua listando o contrato da nota que falhou');
+  assert.deepEqual(brokenAgain.out.match(/removido ·/g), null,
+    'nota que existe não tem contrato órfão');
+
+  rmSync(notionNote);
+  const notionGone = sync(vaultRoot, '--confirm');
+  assert.ok(notionGone.lines.includes('removido · .cerebro/contracts/sources/notion.json · nota de origem não existe mais'),
+    `apagada a nota, o contrato dela sai mesmo depois de uma rodada com erro: ${notionGone.out}`);
+  assert.equal(existsSync(notionContract), false, 'o contrato não fica para sempre em disco');
+  assert.equal(registered().includes('.cerebro/contracts/sources/notion.json'), false,
+    'o registro deixa de listar o arquivo removido');
 
   // ── 6. órfão: nota apagada tira o contrato dela e só o dela ─────────────────────
   rmSync(join(vaultRoot, 'sistema', 'fontes', 'gmail.md'));

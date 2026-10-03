@@ -99,15 +99,25 @@ export function zonedInstant(date, time, timezone) {
   return new Date(instant).toISOString();
 }
 
-// Data do dia ISO pedido dentro de uma semana ISO (segunda = 1 … domingo = 7).
+// Quantas semanas o ano ISO tem: 53 quando 1º de janeiro cai na quinta, ou na quarta de
+// ano bissexto; 52 no resto. É a régua que separa W53 de verdade de W53 chutada.
+function isoWeeksInYear(year) {
+  const jan1IsoDay = ((new Date(Date.UTC(year, 0, 1)).getUTCDay() + 6) % 7) + 1;
+  const leap = (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;
+  return jan1IsoDay === 4 || (leap && jan1IsoDay === 3) ? 53 : 52;
+}
+
+// Data do dia ISO pedido dentro de uma semana ISO (segunda = 1 … domingo = 7). Semana
+// fora da régua do ano não vira data aproximada: o chamador recusa a nota com motivo.
 export function isoWeekDate(year, week, isoDay) {
+  if (!Number.isInteger(week) || week < 1 || week > isoWeeksInYear(year)) {
+    throw new Error(`semana ISO inválida: ${year}-W${String(week).padStart(2, '0')}`);
+  }
   const jan4 = Date.UTC(year, 0, 4);
   const jan4IsoDay = ((new Date(jan4).getUTCDay() + 6) % 7) + 1;
   const week1Monday = jan4 - (jan4IsoDay - 1) * DAY_MS;
   const target = week1Monday + ((week - 1) * 7 + (isoDay - 1)) * DAY_MS;
-  const value = new Date(target);
-  if (!Number.isFinite(value.getTime())) throw new Error(`semana ISO inválida: ${year}-W${week}`);
-  return value.toISOString().slice(0, 10);
+  return new Date(target).toISOString().slice(0, 10);
 }
 
 function bodyOf(text) {
@@ -134,10 +144,12 @@ export function declaredActor(text) {
 
 // Rotinas que gravam no journal, separadas pela cadência que declaram. Nada é hardcoded:
 // a ligação vem do `destination` e do `trigger.schedule.cadence` do contrato compilado.
-function journalRoutines(root, journalRef) {
+function journalRoutines(root, journalRef, issues) {
   const found = new Map();
   const ambiguous = [];
-  for (const contract of listRoutineContracts(root)) {
+  // Um contrato ilegível é uma rotina a menos, nunca o fim da importação: o arquivo
+  // culpado vai para o coletor e sai nomeado no relatório.
+  for (const contract of listRoutineContracts(root, { issues })) {
     if (contract.trigger?.type !== 'schedule') continue;
     if (contract.destination?.kind !== 'local-file') continue;
     if (posix(String(contract.destination.ref || '')) !== posix(journalRef)) continue;
@@ -312,6 +324,7 @@ export function importVaultJournalRuns(root, { confirm = false } = {}) {
     skipped: [],
     pii_refused: [],
     invalid: [],
+    invalid_routines: [],
     conflicts: [],
     items: [],
     already_imported: 0,
@@ -324,13 +337,15 @@ export function importVaultJournalRuns(root, { confirm = false } = {}) {
   const journalRef = typeof config.daily === 'string' && config.daily ? config.daily : 'journal';
   if (!inside(root, journalRef)) throw new Error('o layout aponta o journal fora do Cérebro');
 
-  const { found, ambiguous } = journalRoutines(root, journalRef);
+  const invalidRoutines = [];
+  const { found, ambiguous } = journalRoutines(root, journalRef, invalidRoutines);
   const bindings = new Map();
   const report = {
     ...empty,
     mode: 'vault',
     journal_ref: journalRef,
     ambiguous,
+    invalid_routines: invalidRoutines,
     routines: Object.fromEntries([...found].map(([kindId, contract]) => [kindId, {
       routine_id: contract.routine_id, version: contract.version, name: contract.name,
     }])),

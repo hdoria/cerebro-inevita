@@ -303,6 +303,10 @@ try {
   write(join(vaultRoot, 'journal', '2026-W28-review.md'), weekly({ week: '2026-W28', created: '2026-07-12' }));
   write(join(vaultRoot, 'journal', '2026-03-17.md'), daily({ date: '2026-03-17' }));
   write(join(vaultRoot, 'journal', 'rascunho-da-semana.md'), '---\ntype: Note\n---\n\n# rascunho\n');
+  // Semana fora da régua ISO: W00 não existe e 2025 não tem W53. Nome que parece weekly
+  // review não pode virar execução numa data chutada.
+  write(join(vaultRoot, 'journal', '2026-W00-review.md'), weekly({ week: '2026-W00', created: '2026-07-12' }));
+  write(join(vaultRoot, 'journal', '2025-W53-review.md'), weekly({ week: '2025-W53', created: '2025-12-29' }));
 
   // ── 0. os contratos compilados são o pré-requisito ─────────────────────────────
   const compiled = run(COMPILE, vaultRoot, '--confirm');
@@ -319,6 +323,10 @@ try {
     `nota anterior ao not_before sai com motivo: ${dry.out}`);
   assert.ok(dry.lines.includes('ignorada · journal/rascunho-da-semana.md · nome fora da convenção de daily ou weekly review'),
     `nota fora da convenção sai com motivo: ${dry.out}`);
+  assert.ok(dry.lines.includes('ignorada · journal/2026-W00-review.md · semana ISO inválida: 2026-W00'),
+    `semana zero não existe e sai com motivo: ${dry.out}`);
+  assert.ok(dry.lines.includes('ignorada · journal/2025-W53-review.md · semana ISO inválida: 2025-W53'),
+    `semana 53 em ano de 52 semanas sai com motivo em vez de virar data chutada: ${dry.out}`);
   assert.match(dry.out, /simulação: 4 execução\(ões\) · 4 a gravar · 0 já no runtime/,
     `a simulação diz quantas execuções entrariam: ${dry.out}`);
   assert.deepEqual(dir(vaultRoot, RECEIPTS), [], 'sem --confirm, nenhum recibo é gravado');
@@ -444,11 +452,18 @@ try {
   assert.equal(api.graph.trace_origin, 'reconstructed');
   assert.ok(api.graph.trace_events >= 5, 'o Canvas do run recebe o trace reconstruído');
 
-  // ── 6. reimportar não acrescenta nada ──────────────────────────────────────────
+  // ── 6. reimportar não acrescenta nada, nem com contrato de Rotina ilegível ─────
+  // Um contrato ilegível é uma rotina a menos, nunca o fim da importação: as rotinas
+  // válidas continuam encontradas e o arquivo culpado sai nomeado no relatório.
+  write(join(vaultRoot, '.cerebro', 'contracts', 'routines', 'quebrado.json'), '{quebrado');
   const again = run(IMPORT, vaultRoot, '--confirm');
   assert.equal(again.code, 0, `a segunda rodada sai com código 0: ${again.out}${again.err}`);
   assert.match(again.out, /4 execução\(ões\) · 0 gravada\(s\) · 4 já no runtime/,
     `a segunda rodada não grava nada: ${again.out}`);
+  assert.ok(again.lines.includes('contrato de rotina ilegível · .cerebro/contracts/routines/quebrado.json · routine-contract-invalid'),
+    `contrato de rotina ilegível é reportado, não engolido: ${again.out}`);
+  assert.ok(again.lines.includes('dailies · daily-nuvem 0.1.0 · 3 execução(ões)'),
+    `a rotina diária continua encontrada ao lado do contrato quebrado: ${again.out}`);
   assert.deepEqual(dir(vaultRoot, RECEIPTS), receiptFiles, 'os mesmos recibos continuam no runtime');
   assert.deepEqual(dir(vaultRoot, OUTPUTS), pointerFiles, 'os mesmos ponteiros continuam no runtime');
   assert.deepEqual(dir(vaultRoot, TRACES), traceFiles, 'os mesmos traces continuam no runtime');

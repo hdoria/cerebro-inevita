@@ -573,10 +573,13 @@ export function importVaultSessionHistory(root, { confirm = false } = {}) {
     records: [],
   };
 
+  // Pasta de sessões ausente (apagada ou repontada no layout) é zero sessão, não "nada a
+  // fazer": o bloco deste importador precisa ser retirado do ledger como em qualquer
+  // outra leitura, senão o run importado vive para sempre sem nota que o sustente.
   const directory = resolve(root, sessionsRef);
-  if (!existsSync(directory)) return report;
+  const names = existsSync(directory) ? markdownFiles(directory) : [];
 
-  for (const name of markdownFiles(directory)) {
+  for (const name of names) {
     const dated = DATED_NOTE_RE.exec(name);
     if (!dated) continue;
     const ref = join(sessionsRef, name);

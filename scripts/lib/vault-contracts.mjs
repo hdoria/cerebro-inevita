@@ -1276,10 +1276,12 @@ function readRegistry(root) {
 
 // Template e rascunho declaram o type para herdar o formulário do app, mas não são
 // declaração de nada: ficam fora da compilação, como já ficam na leitura de
-// procedimentos.
+// procedimentos. `templates/` conta em qualquer nível — a pasta pode morar numa subpasta
+// do vault, e o caminho ainda vem prefixado pela raiz de conhecimento.
 function isDraft(path) {
-  const name = path.slice(path.lastIndexOf('/') + 1);
-  return path.startsWith('templates/') || name.startsWith('_');
+  const segments = path.split('/');
+  const name = segments[segments.length - 1];
+  return segments.slice(0, -1).includes('templates') || name.startsWith('_');
 }
 
 // Notas do vault com um dos types compiláveis. Ignora pasta oculta e node_modules
@@ -1462,18 +1464,28 @@ export function compileVaultContracts(root, { confirm = false, now = new Date() 
 
   const registry = readRegistry(base);
   const notePaths = new Set(notes.map((note) => note.path));
+  const failedNotes = new Set(results.filter((item) => item.status === 'error').map((item) => item.path));
+  // Nota que existe e falhou na validação fica com o último contrato bom em disco (ver o
+  // laço de erros acima). O registro precisa continuar listando esse arquivo, senão ele
+  // vira órfão invisível: quando a nota for apagada, ninguém mais sabe que era dela.
+  const retained = new Map();
   for (const entry of registry.files) {
     if (!entry || typeof entry.path !== 'string') continue;
     if (owned.has(entry.path)) continue;
     // Só é órfão o arquivo que este compilador gerou para uma nota que não existe mais.
-    if (typeof entry.note === 'string' && notePaths.has(entry.note)) continue;
+    if (typeof entry.note === 'string' && notePaths.has(entry.note)) {
+      if (failedNotes.has(entry.note) && existsSync(join(base, entry.path))) {
+        retained.set(entry.path, { type: entry.type, note: entry.note });
+      }
+      continue;
+    }
     removed.push(entry.path);
     if (confirm) rmSync(join(base, entry.path), { force: true });
   }
 
   const nextRegistry = {
     protocol_version: 1,
-    files: [...owned.entries()]
+    files: [...owned.entries(), ...retained.entries()]
       .map(([path, entry]) => ({ path, type: entry.type, note: entry.note }))
       .sort((left, right) => left.path.localeCompare(right.path)),
   };
