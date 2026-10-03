@@ -944,6 +944,10 @@ export function systemWorkspace(root, ref) {
       eval: contract.eval || null,
       learning: contract.learning || null,
       trigger: contract.trigger || null,
+      // Procedimento (SOP) que o Sistema declara, pelo slug da nota. É o que permite a
+      // tela desenhar o processo real em vez do fluxo genérico. Contrato sem a extensão
+      // (instalação INEVITA, por exemplo) responde null — nunca erro.
+      procedure_ref: contract.extensions?.procedure_ref || null,
     },
     sources,
     records,

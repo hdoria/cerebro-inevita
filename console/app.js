@@ -567,6 +567,38 @@ function wsOverview(ws) {
   </div>`;
 }
 
+// O SOP que o Sistema declara: o contrato aponta o procedimento pelo slug e a tela só
+// desenha o fluxo quando /api/procedures tem essa nota com passo legível. Procedimento
+// não declarado, não encontrado ou privado e escondido devolve null — e o Sistema
+// mantém o fluxo declarado de seis etapas.
+function wsLinkedProcedure(ws, model) {
+  const ref = ws?.contract?.procedure_ref;
+  if (!ref) return null;
+  const found = (model?.procedures || []).find((item) => item.slug === ref);
+  return found && found.flows.length ? found : null;
+}
+
+// Mesmos componentes da tela Procedimentos (classes `sop-*`): o processo é um só, visto
+// de dois lugares. Nada de estilo inline, que a CSP do Console bloqueia.
+function wsProcedureOrgan(procedure) {
+  const meta = [
+    procedure.path ? `<code>${escapeHtml(procedure.path)}</code>` : '',
+    procedure.status ? badge(procedure.status, 'neutral', procedure.status) : '',
+    procedure.updated ? `<span class="sop-updated">atualizado em ${escapeHtml(fmtDate(procedure.updated, false))}</span>` : '',
+  ].filter(Boolean).join('');
+  return `<section class="organ ws-sop-organ"><header class="organ-head">
+      <div><h3>Procedimento ligado · ${escapeHtml(procedure.title)}</h3>
+      <p>O SOP que a nota do Sistema declara, lido do vault: ${procedure.flow_count} fluxo(s) e ${procedure.step_count} passo(s), com papel e ramo de decisão.</p></div>
+      <button class="action" type="button" data-open-procedure="${escapeHtml(procedure.slug)}">Abrir em Procedimentos →</button>
+    </header>
+    ${meta ? `<div class="sop-head-meta ws-sop-meta">${meta}</div>` : ''}
+    ${procedure.flows.map(procedureFlow).join('')}
+    ${procedure.done.length
+      ? `<section class="sop-done"><p class="micro">Critério de pronto</p><ul>${procedure.done.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ul></section>`
+      : ''}
+  </section>`;
+}
+
 function wsProcessFlow(stages) {
   return `<div class="ws-canvas-flow" role="list">${stages.map((stage, index) => `<div class="ws-flow-step" role="listitem" data-flow-kind="${escapeHtml(stage.kind)}">
     <p class="micro">${escapeHtml(stage.label)}</p><b>${escapeHtml(stage.value)}</b><small>${escapeHtml(stage.detail)}</small>
@@ -587,8 +619,12 @@ function wsHowDeclared(ws) {
     { kind: 'gate', label: 'Gates', value: evalContract ? `${(evalContract.deterministic_gates || []).length + (evalContract.human_questions || []).length} declarados` : 'não declarados', detail: result.definition_of_done || 'definição de pronto ausente' },
     { kind: 'judgment', label: 'Julgamento', value: result.human_gate || ws.system.human_gate || 'não declarado', detail: 'o Sistema não julga a própria resposta' },
   ];
+  const linked = wsLinkedProcedure(ws, state.procedures.data);
+  const flow = linked
+    ? wsProcedureOrgan(linked)
+    : `<section class="organ ws-canvas-organ"><header class="organ-head"><div><h3>Fluxo declarado</h3><p>System Contract e contratos associados — nenhuma execução inferida.</p></div></header>${wsProcessFlow(stages)}</section>`;
   return `<div class="ws-stack">
-    <section class="organ ws-canvas-organ"><header class="organ-head"><div><h3>Fluxo declarado</h3><p>System Contract e contratos associados — nenhuma execução inferida.</p></div></header>${wsProcessFlow(stages)}</section>
+    ${flow}
     <section class="organ"><header class="organ-head"><div><h3>Política de recuperação ${retrieval ? `v${escapeHtml(retrieval.version)}` : ''}</h3><p>o backend de contexto que o Sistema pode consumir</p></div></header>
       ${retrieval ? `<div class="table-wrap organ-table"><table><thead><tr><th>Papel</th><th>Seleção</th><th>Filtros</th><th>Janela</th><th>Frescor exigido</th><th>Se indisponível</th></tr></thead><tbody>${(retrieval.source_roles || []).map((role) => `<tr><td><b>${role.priority}</b> ${escapeHtml(role.role)}</td><td>${escapeHtml(role.selection || '—')}</td><td>${(role.filters || []).map((filter) => `<code>${escapeHtml(filter)}</code>`).join(' ')}</td><td>${escapeHtml(role.window || '—')}</td><td>${escapeHtml(role.required_freshness || '—')}</td><td>${escapeHtml(role.on_unavailable || '—')}</td></tr>`).join('')}</tbody></table></div>` : '<p class="gap-mark">Recuperação não declarada.</p>'}
     </section>
@@ -4210,6 +4246,15 @@ document.addEventListener('click', (event) => {
       () => toast('Comando do diagnóstico copiado.'),
       () => toast('Não foi possível copiar o comando.', 'bad'),
     );
+    return;
+  }
+  // Abrir o SOP ligado a um Sistema na tela Procedimentos, já selecionado.
+  const openProcedure = event.target.closest('[data-open-procedure]');
+  if (openProcedure) {
+    state.procedures.selected = openProcedure.dataset.openProcedure;
+    state.view = 'procedures';
+    closeDrawer();
+    render();
     return;
   }
   const procedure = event.target.closest('[data-procedure]');

@@ -2814,6 +2814,12 @@ nav button[hidden] { display: none; }
 .sop-done { padding: var(--s4); border: 1px solid color-mix(in srgb, var(--ok) 26%, var(--hairline)); border-radius: var(--r-lg); background: var(--ok-soft); }
 .sop-done ul { margin: var(--s2) 0 0; padding-left: 18px; color: var(--text-2); font-size: var(--fs-body); line-height: 1.6; }
 
+/* O mesmo SOP dentro do workspace do Sistema, em "Como o Sistema funciona". */
+.ws-sop-organ > .organ-head { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: var(--s3); }
+.ws-sop-organ > .organ-head .action { flex: 0 0 auto; text-decoration: none; }
+.ws-sop-meta { margin: var(--s3) 0 var(--s5); }
+.ws-sop-organ .sop-flow:last-of-type { margin-bottom: var(--s4); }
+
 @media (max-width: 1000px) {
   .sop-layout { grid-template-columns: minmax(0, 1fr); gap: var(--s5); }
   .sop-list { position: static; }
