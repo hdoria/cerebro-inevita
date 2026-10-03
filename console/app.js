@@ -40,6 +40,9 @@ const state = {
   },
   brainGraph: null,
   skills: { origin: 'company', status: 'all', link: 'all', query: '', data: null, loading: false, error: null },
+  // Procedimentos (SOPs) do vault. `available` desliga a view inteira fora do modo
+  // vault; `reveal` nasce desligado em cada carregamento, como em knowledge.
+  procedures: { data: null, loading: false, loaded: false, error: null, available: false, selected: null, reveal: false },
   society: { filter: 'all', query: '', data: null, loading: false, error: null, selected: null },
   cases: { list: null, detail: null, form: null, preview: null, actor: '' },
   // Revelar título de nota privada é estado só do cliente: nasce desligado em cada
@@ -2821,7 +2824,126 @@ async function rollbackCase() {
   }
 }
 
-const renderers = { activation: renderActivation, compatibility: renderCompatibility, today: renderToday, anatomy: renderAnatomy, system: renderSystemWorkspace, canvas: renderCanvas, areas: renderAreas, systems: renderSystems, skills: renderSkills, sources: renderSources, experiments: renderExperiments, routines: renderRoutines, judgments: renderJudgments, cases: renderCases, runs: renderRuns, governance: renderGovernance, health: renderHealth, society: renderSociety };
+/* --- Procedimentos — cada SOP do vault desenhado como fluxo vertical: cartões
+   numerados, papel de quem faz, decisão com ramos clicáveis e critério de pronto.
+   Tudo em HTML/CSS por classe; a CSP do Console proíbe estilo inline. --- */
+
+function procedureStepId(flow, n) {
+  return `sop-${flow.id}-${n}`;
+}
+
+function procedureBranch(flow, branch) {
+  const exists = flow.steps.some((step) => step.n === branch.target);
+  const copy = `Se ${escapeHtml(branch.condition)} <b>→ passo ${branch.target}</b>`;
+  return exists
+    ? `<button type="button" class="sop-branch" data-sop-target="${escapeHtml(procedureStepId(flow, branch.target))}">${copy}</button>`
+    : `<span class="sop-branch is-missing" title="A nota aponta para um passo que não existe neste fluxo">${copy}</span>`;
+}
+
+function procedureStep(flow, step) {
+  const decision = step.branches.length > 0;
+  return `<li class="sop-step${decision ? ' is-decision' : ''}" id="${escapeHtml(procedureStepId(flow, step.n))}">
+    <span class="sop-step-mark" aria-hidden="true">${step.n}</span>
+    <div class="sop-step-body">
+      ${step.role ? `<span class="sop-role">${escapeHtml(step.role)}</span>` : ''}
+      <p><span class="sop-step-n">Passo ${step.n}.</span> ${escapeHtml(step.text)}</p>
+      ${step.details.length ? `<ul class="sop-step-details">${step.details.map((detail) => `<li>${escapeHtml(detail)}</li>`).join('')}</ul>` : ''}
+      ${decision ? `<div class="sop-branches" aria-label="Ramos de decisão">${step.branches.map((branch) => procedureBranch(flow, branch)).join('')}</div>` : ''}
+    </div>
+  </li>`;
+}
+
+function procedureFlow(flow) {
+  return `<section class="sop-flow">
+    <header><h3>${escapeHtml(flow.title)}</h3><span>${flow.steps.length} passo(s)</span></header>
+    <ol class="sop-steps">${flow.steps.map((step) => procedureStep(flow, step)).join('')}</ol>
+  </section>`;
+}
+
+function procedureDetail(procedure) {
+  if (!procedure) return empty('Nenhum procedimento selecionado', 'Escolha um procedimento na lista para ver o fluxo.');
+  if (!procedure.title) {
+    return empty('Procedimento privado', `${procedure.step_count} passo(s) em ${procedure.flow_count} fluxo(s). Revele os privados para abrir o fluxo nesta tela.`);
+  }
+  const meta = [
+    procedure.path ? `<code>${escapeHtml(procedure.path)}</code>` : '',
+    procedure.status ? badge(procedure.status, 'neutral', procedure.status) : '',
+    procedure.updated ? `<span class="sop-updated">atualizado em ${escapeHtml(fmtDate(procedure.updated, false))}</span>` : '',
+    ...procedure.sistema_refs.map((ref) => `<span class="sop-system" data-sop-system="${escapeHtml(ref.slug)}">Sistema · ${escapeHtml(ref.title)}</span>`),
+  ].filter(Boolean).join('');
+  return `<div class="sop-head"><p class="eyebrow">Procedimento</p><h2>${escapeHtml(procedure.title)}</h2><div class="sop-head-meta">${meta}</div></div>
+    ${procedure.flows.map(procedureFlow).join('') || empty('Nenhum passo numerado', 'A nota existe, mas não tem lista numerada em nenhuma seção.')}
+    ${procedure.done.length
+      ? `<section class="sop-done"><p class="micro">Critério de pronto</p><ul>${procedure.done.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ul></section>`
+      : '<p class="section-help">Esta nota não declara critério de pronto. Sem ele, o fluxo não diz quando parou.</p>'}`;
+}
+
+function procedureItem(procedure, selectedSlug) {
+  return `<button type="button" class="sop-item${procedure.slug === selectedSlug ? ' active' : ''}${procedure.title ? '' : ' is-private'}" data-procedure="${escapeHtml(procedure.slug)}">
+    <strong>${escapeHtml(procedure.title || 'Procedimento privado')}</strong>
+    <small>${procedure.flow_count} fluxo(s) · ${procedure.step_count} passo(s)</small>
+  </button>`;
+}
+
+// Seleção: a escolha da pessoa vale; sem escolha, o primeiro procedimento legível.
+function selectedProcedure(list) {
+  return list.find((item) => item.slug === state.procedures.selected)
+    || list.find((item) => item.flows.length)
+    || list[0] || null;
+}
+
+function renderProcedures() {
+  const model = state.procedures.data;
+  if (!model) {
+    if (state.procedures.error) return empty('Procedimentos indisponíveis', 'Atualize o Console para tentar ler os procedimentos do vault.');
+    if (state.procedures.loaded) return empty('Procedimentos não declarados', 'Este Cérebro não declara pasta de procedimentos no layout do vault.');
+    if (!state.procedures.loading) void loadProcedures();
+    return '<div class="loading"><i></i><span>Lendo os procedimentos do vault…</span></div>';
+  }
+  const list = model.procedures || [];
+  if (!list.length) return empty('Nenhum procedimento no vault', `A pasta ${model.folder}/ não tem nota de procedimento.`);
+  const selected = selectedProcedure(list);
+  const hidden = list.filter((item) => item.private).length;
+  const toggle = hidden
+    ? `<button type="button" class="sop-reveal" data-sop-reveal="${state.procedures.reveal ? '0' : '1'}">${state.procedures.reveal ? 'Esconder' : 'Revelar'} ${hidden} privado(s)</button>`
+    : '';
+  return `<div class="section-heading"><div><p class="eyebrow">Como o trabalho acontece</p><h2>Procedimentos</h2></div><p>Passos numerados, papel de quem faz, decisão com ramo e critério de pronto — lidos direto das notas do vault.</p></div>
+    <div class="sop-boundary"><span>${model.counts.procedures} procedimento(s) · ${model.counts.flows} fluxo(s) · ${model.counts.steps} passo(s)</span><small>Leitura de ${escapeHtml(model.folder)}/ — o Console nunca escreve na nota.</small></div>
+    <div class="sop-layout">
+      <aside class="sop-list" aria-label="Procedimentos do vault">${list.map((item) => procedureItem(item, selected?.slug)).join('')}${toggle}</aside>
+      <div class="sop-detail">${procedureDetail(selected)}</div>
+    </div>`;
+}
+
+// Rolar até o passo-alvo do ramo e destacá-lo por classe (nunca por estilo inline).
+function focusProcedureStep(id) {
+  const step = document.getElementById(id);
+  if (!step) return;
+  document.querySelectorAll('.sop-step.is-target').forEach((element) => element.classList.remove('is-target'));
+  step.classList.add('is-target');
+  step.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  clearTimeout(focusProcedureStep.timer);
+  focusProcedureStep.timer = setTimeout(() => step.classList.remove('is-target'), 2600);
+}
+
+async function loadProcedures() {
+  if (state.procedures.loading) return;
+  state.procedures.loading = true;
+  state.procedures.error = null;
+  try {
+    const model = await getJson(`/api/procedures${state.procedures.reveal ? '?reveal=1' : ''}`);
+    state.procedures.available = Boolean(model.available);
+    state.procedures.data = model.available ? model : null;
+  } catch (error) {
+    state.procedures.error = error.message;
+  } finally {
+    state.procedures.loading = false;
+    state.procedures.loaded = true;
+    if (state.view === 'procedures') render();
+  }
+}
+
+const renderers = { activation: renderActivation, compatibility: renderCompatibility, today: renderToday, anatomy: renderAnatomy, system: renderSystemWorkspace, canvas: renderCanvas, areas: renderAreas, systems: renderSystems, skills: renderSkills, procedures: renderProcedures, sources: renderSources, experiments: renderExperiments, routines: renderRoutines, judgments: renderJudgments, cases: renderCases, runs: renderRuns, governance: renderGovernance, health: renderHealth, society: renderSociety };
 const titles = {
   activation: ['Primeira Missão', 'Ative o Cérebro pelo uso, começando com um trabalho real.'],
   compatibility: ['Compatibilidade do protocolo', 'Migração e aderência ao protocolo — não é um placar de saúde do cérebro.'],
@@ -2832,6 +2954,7 @@ const titles = {
   areas: ['Mapa / Áreas', 'A empresa plural, sem transformar navegação em casa da verdade.'],
   systems: ['Sistemas', 'Resultados executáveis ligados ao contexto real do negócio.'],
   skills: ['Skills', 'Capacidades executáveis disponíveis nesta empresa e no motor do Company Brain.'],
+  procedures: ['Procedimentos', 'Cada procedimento do vault desenhado como fluxo: passos, papel, decisões e critério de pronto.'],
   sources: ['Fontes', 'Casas de verdade, autoridade, frescor e garantia de acesso.'],
   experiments: ['Experimentos', 'Hipótese, execução, medição, martelo e aprendizado ligados ao Sistema.'],
   routines: ['Rotinas', 'Quando o cérebro trabalha, com qual contexto e quem precisa decidir.'],
@@ -2847,7 +2970,7 @@ const titles = {
 const viewGroups = {
   activation: 'Ativação',
   today: 'Operação', judgments: 'Operação', cases: 'Operação', routines: 'Operação', runs: 'Operação',
-  anatomy: 'Cérebro', skills: 'Cérebro',
+  anatomy: 'Cérebro', skills: 'Cérebro', procedures: 'Cérebro',
   system: 'Sistemas', systems: 'Sistemas',
   canvas: 'Estrutura', areas: 'Estrutura', sources: 'Estrutura', experiments: 'Estrutura',
   compatibility: 'Confiança', governance: 'Confiança', health: 'Confiança',
@@ -2941,6 +3064,9 @@ function render() {
     const views = (element.dataset.views || element.dataset.view).split(',');
     element.classList.toggle('active', views.includes(state.view));
   });
+  // Procedimentos só existe em modo vault: fora dele o botão da nav nem aparece.
+  const procedureNav = $('#navigation [data-view="procedures"]');
+  if (procedureNav) procedureNav.hidden = !state.procedures.available;
   if (state.view === 'anatomy') {
     const strip = $('.brain-mode-switch');
     const activeMode = strip?.querySelector('button.active');
@@ -3755,13 +3881,19 @@ async function performAction(action) {
 }
 
 async function loadModel() {
-  const [model, decisions, vaultToday] = await Promise.all([
+  const [model, decisions, vaultToday, procedures] = await Promise.all([
     getJson('/api/console'),
     getJson('/api/decisions').catch(() => null),
     getJson('/api/vault-today').catch(() => null),
+    getJson('/api/procedures').catch(() => null),
     loadCases(),
   ]);
   state.vaultToday = vaultToday?.available ? vaultToday : null;
+  state.procedures.available = Boolean(procedures?.available);
+  state.procedures.data = procedures?.available ? procedures : null;
+  state.procedures.loaded = true;
+  state.procedures.selected = null;
+  if (state.view === 'procedures' && !state.procedures.available) state.view = 'today';
   state.model = model;
   if (!state.initialRouteResolved || (state.view === 'activation' && model.activation.complete)) {
     state.view = model.activation.complete ? 'today' : 'activation';
@@ -3908,6 +4040,23 @@ document.addEventListener('click', (event) => {
       () => toast('Comando do diagnóstico copiado.'),
       () => toast('Não foi possível copiar o comando.', 'bad'),
     );
+    return;
+  }
+  const procedure = event.target.closest('[data-procedure]');
+  if (procedure) {
+    state.procedures.selected = procedure.dataset.procedure;
+    render();
+    return;
+  }
+  const procedureTarget = event.target.closest('[data-sop-target]');
+  if (procedureTarget) {
+    focusProcedureStep(procedureTarget.dataset.sopTarget);
+    return;
+  }
+  const procedureReveal = event.target.closest('[data-sop-reveal]');
+  if (procedureReveal) {
+    state.procedures.reveal = procedureReveal.dataset.sopReveal === '1';
+    void loadProcedures();
     return;
   }
   const knowledgeReveal = event.target.closest('[data-knowledge-reveal]');
@@ -4154,9 +4303,11 @@ function paletteGlyph(view) {
 }
 
 function paletteItems() {
-  const items = Object.entries(titles).map(([view, [title]]) => ({
-    glyph: view, title, hint: 'View', run: () => { state.view = view; closeDrawer(); render(); },
-  }));
+  const items = Object.entries(titles)
+    .filter(([view]) => view !== 'procedures' || state.procedures.available)
+    .map(([view, [title]]) => ({
+      glyph: view, title, hint: 'View', run: () => { state.view = view; closeDrawer(); render(); },
+    }));
   const model = state.model;
   if (model) {
     model.routines.forEach((routine) => items.push({

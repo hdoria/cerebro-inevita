@@ -2751,3 +2751,70 @@ body[data-current-view="activation"] .topbar { padding-bottom: var(--s4); border
   .first-mission-update { grid-template-columns: 1fr; padding: var(--s4); }
   .first-mission-actions > button { width: 100%; }.brain-activation-receipt dl { grid-template-columns: 1fr; gap: var(--s3); }.brain-context-agreement ol { grid-template-columns: 1fr; }.brain-context-agreement li, .brain-context-agreement li:first-child, .brain-context-agreement li:nth-child(3) { padding: var(--s3) 0; border-top: 1px solid var(--hairline); border-left: 0; }
 }
+
+/* ==========================================================================
+   PROCEDIMENTOS (SOP do vault) — fluxo vertical em HTML/CSS. Cartão numerado,
+   papel de quem faz, passo de decisão com ramos clicáveis e critério de pronto.
+   Nenhum estilo inline: a CSP do Console (style-src 'self') bloquearia.
+   ========================================================================== */
+/* `nav button` define display: grid, que ganha do atributo hidden do HTML. A view
+   Procedimentos só existe em modo vault, então o botão precisa sumir de verdade. */
+nav button[hidden] { display: none; }
+
+.sop-boundary { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--s2) var(--s4); margin-bottom: var(--s5); padding: 10px 14px; border: 1px solid var(--hairline); border-radius: var(--r-md); background: var(--surface); }
+.sop-boundary span { color: var(--text); font: 590 var(--fs-meta) var(--font-sans); font-variant-numeric: tabular-nums; }
+.sop-boundary small { color: var(--text-3); font-size: var(--fs-micro); }
+
+.sop-layout { display: grid; grid-template-columns: minmax(196px, 258px) minmax(0, 1fr); gap: var(--s6); align-items: start; }
+.sop-list { display: grid; gap: var(--s2); position: sticky; top: var(--s3); }
+.sop-item { display: grid; gap: 2px; padding: 10px var(--s3); color: var(--text); border: 1px solid var(--hairline); border-radius: var(--r-md); background: var(--surface); cursor: pointer; text-align: left; transition: border-color .12s var(--ease), background-color .12s var(--ease); }
+.sop-item:hover { border-color: var(--hairline-2); }
+.sop-item.active { border-color: var(--brand); background: color-mix(in srgb, var(--brand) 6%, var(--surface)); }
+.sop-item strong { font: 590 var(--fs-body) var(--font-sans); }
+.sop-item small { color: var(--text-3); font: 460 var(--fs-micro) var(--font-mono); font-variant-numeric: tabular-nums; }
+.sop-item.is-private strong { color: var(--text-3); font-style: italic; }
+.sop-reveal { margin-top: var(--s2); padding: var(--s2) var(--s3); color: var(--text-2); border: 1px dashed var(--hairline-2); border-radius: var(--r-md); background: transparent; cursor: pointer; font: 500 var(--fs-micro) var(--font-sans); }
+.sop-reveal:hover { color: var(--text); border-color: var(--text-3); }
+
+.sop-detail { min-width: 0; }
+.sop-head { margin-bottom: var(--s5); padding-bottom: var(--s4); border-bottom: 1px solid var(--hairline); }
+.sop-head h2 { margin: var(--s1) 0 var(--s3); font: 580 var(--fs-title)/1.2 var(--font-sans); letter-spacing: -.02em; }
+.sop-head-meta { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2) var(--s3); }
+.sop-head-meta code { color: var(--text-3); font: 460 var(--fs-micro) var(--font-mono); }
+.sop-updated { color: var(--text-3); font-size: var(--fs-micro); }
+.sop-system { display: inline-flex; align-items: center; padding: 2px var(--s2); color: var(--text-2); border: 1px solid var(--hairline-2); border-radius: var(--r-sm); background: var(--raised); font: 520 var(--fs-micro) var(--font-sans); }
+
+.sop-flow { margin-bottom: var(--s6); }
+.sop-flow > header { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--s2) var(--s3); margin-bottom: var(--s4); }
+.sop-flow > header h3 { margin: 0; font: 580 var(--fs-lead) var(--font-sans); }
+.sop-flow > header span { color: var(--text-3); font: 460 var(--fs-micro) var(--font-mono); font-variant-numeric: tabular-nums; }
+
+.sop-steps { display: grid; gap: var(--s4); margin: 0; padding: 0; list-style: none; }
+.sop-step { position: relative; display: grid; grid-template-columns: 26px minmax(0, 1fr); gap: var(--s3); padding: var(--s3) 14px; border: 1px solid var(--hairline); border-radius: var(--r-lg); background: var(--surface); scroll-margin: var(--s7); transition: border-color .14s var(--ease), box-shadow .14s var(--ease); }
+/* Conector entre cartões: a linha é do próprio cartão, não um elemento extra. */
+.sop-step:not(:last-child)::after { content: ""; position: absolute; bottom: calc(var(--s4) * -1); left: 27px; width: 1px; height: var(--s4); background: var(--hairline-2); }
+.sop-step-mark { display: grid; width: 26px; height: 26px; place-items: center; color: var(--text-2); border: 1px solid var(--hairline-2); border-radius: 50%; background: var(--bg); font: 580 var(--fs-meta) var(--font-mono); font-variant-numeric: tabular-nums; }
+.sop-step-body { min-width: 0; padding-top: 3px; }
+.sop-step-body > p { margin: 0; color: var(--text); font-size: var(--fs-body); line-height: 1.55; }
+/* O número já aparece no marcador; para leitor de tela ele precisa estar no texto. */
+.sop-step-n { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.sop-role { display: inline-block; margin-bottom: var(--s2); padding: 1px var(--s2); color: var(--text-2); border: 1px solid var(--hairline-2); border-radius: var(--r-sm); background: var(--raised); font: 580 var(--fs-micro) var(--font-sans); }
+.sop-step-details { margin: var(--s2) 0 0; padding-left: 18px; color: var(--text-2); font-size: var(--fs-meta); line-height: 1.55; }
+
+.sop-step.is-decision { border-color: color-mix(in srgb, var(--wait) 45%, var(--hairline)); background: var(--wait-soft); }
+.sop-step.is-decision .sop-step-mark { color: var(--wait); border-color: color-mix(in srgb, var(--wait) 55%, transparent); }
+.sop-branches { display: flex; flex-wrap: wrap; gap: var(--s2); margin-top: var(--s3); }
+.sop-branch { display: inline-flex; align-items: center; gap: var(--s2); padding: var(--s1) 10px; color: var(--text); border: 1px solid var(--hairline-2); border-radius: var(--r-md); background: var(--bg); cursor: pointer; font: 500 var(--fs-micro) var(--font-sans); text-align: left; }
+.sop-branch b { color: var(--wait); font: 580 var(--fs-micro) var(--font-mono); white-space: nowrap; }
+.sop-branch:hover { border-color: var(--wait); }
+.sop-branch.is-missing { color: var(--text-3); border-style: dashed; cursor: not-allowed; }
+.sop-branch.is-missing b { color: var(--text-3); }
+.sop-step.is-target { border-color: var(--brand); box-shadow: 0 0 0 2px color-mix(in srgb, var(--brand) 20%, transparent); }
+
+.sop-done { padding: var(--s4); border: 1px solid color-mix(in srgb, var(--ok) 26%, var(--hairline)); border-radius: var(--r-lg); background: var(--ok-soft); }
+.sop-done ul { margin: var(--s2) 0 0; padding-left: 18px; color: var(--text-2); font-size: var(--fs-body); line-height: 1.6; }
+
+@media (max-width: 1000px) {
+  .sop-layout { grid-template-columns: minmax(0, 1fr); gap: var(--s5); }
+  .sop-list { position: static; }
+}
