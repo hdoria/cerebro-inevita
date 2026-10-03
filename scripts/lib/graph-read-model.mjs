@@ -68,7 +68,7 @@ function findSystem(root, ref) {
 }
 
 function routinesForSystem(root, systemId) {
-  return listRoutineContracts(root).filter((routine) => routine.system_ref === systemId);
+  return listRoutineContracts(root, { issues: [] }).filter((routine) => routine.system_ref === systemId);
 }
 
 export function buildBrainGraph(root, { now = new Date() } = {}) {
@@ -850,7 +850,7 @@ export function graphForLayout(root, key) {
   if (key.startsWith('system-')) return buildSystemGraph(root, key.slice('system-'.length));
   if (key.startsWith('run-')) {
     const runId = key.slice('run-'.length);
-    const receipt = listRoutineRunReceipts(root).find((item) => item.run_id === runId);
+    const receipt = listRoutineRunReceipts(root, null, { issues: [] }).find((item) => item.run_id === runId);
     if (receipt) return buildRunGraph(root, receipt.receipt_id);
     if (latestRunRecords(root).some((item) => item.run_id === runId)) return buildRunGraph(root, `run-record:${runId}`);
     throw new Error('graph-run-not-found');

@@ -1072,7 +1072,8 @@ function runsExplorerModel(root) {
   const recordById = new Map(records.map((record) => [record.run_id, record]));
   let receipts = [];
   try {
-    receipts = listRoutineRunReceipts(root);
+    // Recibo ilegível vira aviso pelo arquivo; os bons continuam listados.
+    receipts = listRoutineRunReceipts(root, null, { issues });
   } catch {
     issues.push({ reason_code: 'routine-receipt-invalid', ref: '.cerebro/runtime/receipts/routines' });
   }

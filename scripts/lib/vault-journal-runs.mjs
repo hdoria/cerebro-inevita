@@ -416,7 +416,7 @@ export function importVaultJournalRuns(root, { confirm = false } = {}) {
     items.push(item);
   }
 
-  const existing = new Set(listRoutineRunReceipts(root).map((receipt) => receipt.receipt_id));
+  const existing = new Set(listRoutineRunReceipts(root, null, { issues: [] }).map((receipt) => receipt.receipt_id));
   for (const item of items) {
     report.per_kind[item.kind] += 1;
     report.items.push(item);

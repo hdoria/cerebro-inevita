@@ -4,6 +4,7 @@
 // arquivo inválido vira issue na tela Saúde em vez de derrubar a API, e um vault
 // declarado no layout conta como ativado. Instalação INEVITA sem vault segue igual.
 import assert from 'node:assert/strict';
+import { graphForLayout } from './lib/graph-read-model.mjs';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -110,6 +111,17 @@ try {
   const anatomy = await readConsole(vaultRoot, '/api/anatomy');
   assert.equal(anatomy.status, 200, 'arquivo inválido não pode derrubar /api/anatomy');
   assert.equal(anatomy.value.activation.complete, true);
+
+  // Execuções e Canvas da execução válida também sobrevivem ao recibo quebrado.
+  const runs = await readConsole(vaultRoot, '/api/runs');
+  assert.equal(runs.status, 200, 'arquivo inválido não pode derrubar /api/runs');
+  assert.ok(runs.value.runs.some((item) => item.run_id === receipt.run_id), 'a execução válida continua listada em Runs');
+  assert.ok(runs.value.issues.some((issue) => issue.reason_code === 'routine-receipt-invalid' && issue.ref.endsWith('quebrado.json')),
+    'Runs aponta o recibo ilegível pelo arquivo, sem esconder os bons');
+  // A busca da execução para o Canvas não pode quebrar pelo recibo ilegível: ela acha
+  // a execução válida e só para adiante, porque esta fixture não tem contrato de Sistema.
+  assert.throws(() => graphForLayout(vaultRoot, `run-${receipt.run_id}`), /graph-system-not-found/,
+    'o recibo ilegível não impede achar a execução válida para o Canvas');
 
   // Instalação INEVITA sem vault: a Primeira Missão continua valendo.
   write(join(inevitaRoot, 'VERSION'), 'fixture\n');
