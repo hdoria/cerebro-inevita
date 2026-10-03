@@ -27,28 +27,80 @@ function markdownFiles(dir) {
 }
 
 // Subconjunto de YAML usado pelos vaults: `chave: valor`, `chave: [a, b]` e listas `  - item`.
-export function parseFrontmatter(text) {
+//
+// `objectLists` nomeia as chaves cuja lista é de objetos simples (`- papel: agenda` com
+// continuação indentada, inclusive uma lista de texto dentro do objeto). É opt-in porque
+// um bullet de texto livre pode conter dois-pontos: fora dessas chaves, item de lista
+// continua sendo texto, exatamente como antes.
+export function parseFrontmatter(text, { objectLists = [] } = {}) {
   const match = /^---\r?\n([\s\S]*?)\r?\n---/.exec(text || '');
   if (!match) return {};
+  const objectKeys = new Set(objectLists);
   const data = {};
   let listKey = null;
+  let itemIndent = 0;
+  let current = null;
+  let nestedKey = null;
   for (const line of match[1].split(/\r?\n/)) {
-    const item = /^\s+-\s+(.*)$/.exec(line);
-    if (item && listKey) { data[listKey].push(unquote(item[1])); continue; }
-    const pair = /^([A-Za-z_][\w-]*):\s*(.*)$/.exec(line);
+    const item = /^(\s*)-\s+(.*)$/.exec(line);
+    if (item && listKey) {
+      const indent = item[1].length;
+      if (current && nestedKey && indent > itemIndent) {
+        current[nestedKey].push(unquote(item[2]));
+        continue;
+      }
+      if (!objectKeys.has(listKey)) {
+        data[listKey].push(unquote(item[2]));
+        continue;
+      }
+      itemIndent = indent;
+      current = {};
+      nestedKey = null;
+      data[listKey].push(current);
+      const inner = /^([A-Za-z_][\w-]*):\s*(.*)$/.exec(item[2]);
+      if (inner) assign(current, inner[1], inner[2], (key) => { nestedKey = key; });
+      continue;
+    }
+    const pair = /^(\s*)([A-Za-z_][\w-]*):\s*(.*)$/.exec(line);
     if (!pair) continue;
-    const [, key, raw] = pair;
-    if (raw === '') { data[key] = []; listKey = key; continue; }
+    const [, indentation, key, raw] = pair;
+    if (indentation.length) {
+      // Continuação de um objeto aberto dentro de uma lista de objetos.
+      if (current) assign(current, key, raw, (nested) => { nestedKey = nested; });
+      continue;
+    }
     listKey = null;
-    data[key] = raw.startsWith('[') && raw.endsWith(']')
-      ? raw.slice(1, -1).split(',').map((value) => unquote(value.trim())).filter(Boolean)
-      : unquote(raw);
+    current = null;
+    nestedKey = null;
+    if (raw === '') { data[key] = []; listKey = key; itemIndent = 0; continue; }
+    data[key] = scalar(raw);
   }
   return data;
 }
 
+function assign(target, key, raw, openList) {
+  if (raw === '') {
+    target[key] = [];
+    openList(key);
+    return;
+  }
+  target[key] = scalar(raw);
+  openList(null);
+}
+
+function scalar(raw) {
+  return raw.startsWith('[') && raw.endsWith(']')
+    ? raw.slice(1, -1).split(',').map((value) => unquote(value.trim())).filter(Boolean)
+    : unquote(raw);
+}
+
+// Só par de aspas que abre e fecha o valor inteiro é delimitador. Aspa solta no fim de
+// uma frase (`... com a pergunta "ainda é Active?"`) é conteúdo: tirá-la truncava o texto
+// que entra no contrato.
 function unquote(value) {
-  return String(value).trim().replace(/^["']|["']$/g, '');
+  const text = String(value).trim();
+  const paired = /^"([\s\S]*)"$/.exec(text) || /^'([\s\S]*)'$/.exec(text);
+  return paired ? paired[1] : text;
 }
 
 function title(text, fallback) {

@@ -1807,9 +1807,77 @@ function renderJudgments() {
     <div class="judgment-section"><div class="subheading"><h3>Histórico</h3><span>${decided.length}</span></div>${decided.length ? judgmentList(decided) : '<p class="muted">Nenhum julgamento registrado ainda.</p>'}</div>`;
 }
 
+// Chave de comparação entre a área do vault (slug do arquivo) e a área operacional de um
+// Sistema (`extensions.operating_area`): sem acento, sem caixa, separador único.
+function areaKey(value) {
+  return String(value ?? '')
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '');
+}
+
+// Estrutura › Áreas mostra uma lista só: as áreas do vault somadas às áreas operacionais
+// dos Sistemas. Área que existe nos dois lados aparece uma vez, com os projetos do vault e
+// os Sistemas que rodam nela.
+function mergedAreas(vaultAreas, systemAreas) {
+  const merged = [];
+  const byKey = new Map();
+  for (const area of vaultAreas || []) {
+    const entry = {
+      key: areaKey(area.slug || area.title),
+      name: area.title,
+      status: area.status || null,
+      ref: area.ref || null,
+      active_projects: Number.isFinite(area.active_projects) ? area.active_projects : 0,
+      system_refs: [],
+      routine_refs: [],
+      origin: 'vault',
+    };
+    if (byKey.has(entry.key)) continue;
+    byKey.set(entry.key, entry);
+    merged.push(entry);
+  }
+  for (const area of systemAreas || []) {
+    const match = byKey.get(areaKey(area.operating_area)) || byKey.get(areaKey(area.name));
+    const target = match || {
+      key: areaKey(area.operating_area),
+      name: area.name,
+      status: null,
+      ref: null,
+      active_projects: null,
+      system_refs: [],
+      routine_refs: [],
+      origin: 'system',
+    };
+    target.system_refs = [...new Set([...target.system_refs, ...(area.system_refs || [])])];
+    target.routine_refs = [...new Set([...target.routine_refs, ...(area.routine_refs || [])])];
+    if (match) {
+      target.origin = 'both';
+      continue;
+    }
+    byKey.set(target.key, target);
+    merged.push(target);
+  }
+  return merged;
+}
+
+function areaCard(area) {
+  const index = area.system_refs.length || area.active_projects || 0;
+  const counts = [
+    area.active_projects === null ? null : `${area.active_projects} projeto(s) ativo(s)`,
+    area.system_refs.length ? `${area.system_refs.length} sistema(s)` : null,
+    area.routine_refs.length ? `${area.routine_refs.length} rotina(s)` : null,
+  ].filter(Boolean);
+  const refs = [area.ref, ...area.system_refs].filter(Boolean);
+  return `<article class="object-card" data-kind="area" data-area-origin="${escapeHtml(area.origin)}"><span class="object-index">${String(index).padStart(2, '0')}</span><p class="micro">${escapeHtml(area.status || 'Área')}</p><h3>${escapeHtml(area.name)}</h3><p>${escapeHtml(counts.join(' · ') || 'Nenhum projeto ou sistema declarado')}</p><div class="ref-list">${refs.map((ref) => `<code>${escapeHtml(ref)}</code>`).join('')}</div></article>`;
+}
+
 function renderAreas() {
   if (state.vaultToday?.areas?.length) {
-    return `<div class="section-heading"><div><p class="eyebrow">Responsabilidade</p><h2>Áreas</h2></div><p>Áreas do vault e quantos projetos ativos pertencem ou se relacionam a cada uma.</p></div><div class="object-grid">${state.vaultToday.areas.map((area) => `<article class="object-card" data-kind="area"><span class="object-index">${String(area.active_projects).padStart(2, '0')}</span><p class="micro">${escapeHtml(area.status || 'Área')}</p><h3>${escapeHtml(area.title)}</h3><p>${area.active_projects} projeto(s) ativo(s)</p><div class="ref-list"><code>${escapeHtml(area.ref)}</code></div></article>`).join('')}</div>`;
+    const areas = mergedAreas(state.vaultToday.areas, state.model.areas);
+    return `<div class="section-heading"><div><p class="eyebrow">Responsabilidade</p><h2>Áreas</h2></div><p>Áreas do vault somadas às áreas dos Sistemas: projetos ativos de cada uma e o que roda nelas.</p></div><div class="object-grid">${areas.map((area) => areaCard(area)).join('')}</div>`;
   }
   return `<div class="section-heading"><div><p class="eyebrow">Responsabilidade operacional</p><h2>Áreas responsáveis</h2></div><p>Áreas declaram quem responde internamente. Funções empresariais classificam o trabalho no Launcher e na Society.</p></div><div class="object-grid">${state.model.areas.map((area) => `<article class="object-card" data-kind="area"><span class="object-index">${String(area.system_refs.length).padStart(2, '0')}</span><p class="micro">Área responsável</p><h3>${escapeHtml(area.name)}</h3><p>${area.system_refs.length} sistema(s) · ${area.routine_refs.length} rotina(s)</p><div class="ref-list">${area.system_refs.map((ref) => `<code>${escapeHtml(ref)}</code>`).join('')}</div></article>`).join('') || empty('Nenhuma área responsável declarada', 'Áreas aparecem quando Sistemas possuem contratos válidos.')}</div>`;
 }

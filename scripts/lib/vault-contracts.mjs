@@ -1,6 +1,6 @@
 // Compilador de notas tipadas do vault em contratos do protocolo.
 //
-// O dono descreve Fontes (e, nos próximos tickets, Sistemas e Rotinas) como notas
+// O dono descreve Fontes e Sistemas (e, no próximo ticket, Rotinas) como notas
 // Markdown com frontmatter em português. Este módulo lê essas notas, mapeia os campos
 // para os contratos do protocolo, valida com os validadores que já existem e grava o
 // JSON nos caminhos declarados pelo layout do Cérebro. A nota é a fonte da verdade; o
@@ -17,9 +17,11 @@
 //
 // Para estender: acrescente uma entrada em VAULT_CONTRACT_TYPES com o type da nota, a
 // chave de layout, o mapeador, o validador e o mapa de campo reverso.
-import { existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync } from 'node:fs';
 import { isAbsolute, join, resolve, sep } from 'node:path';
-import { layout, readJson, validateSourceContract, writeJsonAtomic } from './system-protocol.mjs';
+import {
+  VERSION_RE, layout, readJson, validateSourceContract, validateSystemContract, writeJsonAtomic,
+} from './system-protocol.mjs';
 import { parseFrontmatter } from './vault-today.mjs';
 import { knowledgeNotes } from './vault-read-model.mjs';
 
@@ -131,7 +133,25 @@ const DATA_SOURCE_FIELD_BY_PATH = {
 
 function values(raw) {
   if (raw === undefined || raw === null) return [];
-  return (Array.isArray(raw) ? raw : [raw]).map((item) => String(item)).filter((item) => item.trim());
+  return (Array.isArray(raw) ? raw : [raw])
+    .filter((item) => item === null || typeof item !== 'object')
+    .map((item) => String(item))
+    .filter((item) => item.trim());
+}
+
+// Todo texto que o campo carrega, inclusive dentro de lista de objetos: é sobre isso que
+// a varredura de dado pessoal e segredo passa.
+function leaves(raw) {
+  if (raw === undefined || raw === null) return [];
+  if (Array.isArray(raw)) return raw.flatMap((item) => leaves(item));
+  if (typeof raw === 'object') return Object.values(raw).flatMap((item) => leaves(item));
+  const value = String(raw);
+  return value.trim() ? [value] : [];
+}
+
+function objects(raw) {
+  if (!Array.isArray(raw)) return [];
+  return raw.filter((item) => item !== null && typeof item === 'object' && !Array.isArray(item));
 }
 
 function single(raw) {
@@ -153,7 +173,7 @@ function problem(field, reason) {
 function refuseValues(data, fields) {
   const errors = [];
   for (const field of fields) {
-    for (const value of values(data[field])) {
+    for (const value of leaves(data[field])) {
       for (const [pattern, reason] of REFUSED_VALUE_PATTERNS) {
         if (pattern.test(value)) {
           errors.push(problem(field, `${reason}; contrato aceita só referência`));
@@ -283,6 +303,371 @@ function mapDataSource(data, { previous, now }) {
   };
 }
 
+// ── System → System Contract v2 ───────────────────────────────────────────────────────
+
+const SYSTEM_STATUSES = {
+  Proposto: 'proposed', Confirmado: 'confirmed', Ativo: 'active',
+  Atencao: 'needs_attention', Atenção: 'needs_attention',
+};
+const TRIGGER_TYPES = { manual: 'manual', evento: 'event', agendado: 'schedule' };
+const CAPABILITY_ORIGINS = { local: 'local', inevita: 'inevita', externa: 'external' };
+const SOURCE_ACCESS = {
+  leitura: 'read-only', manual: 'manual', 'escrita-com-aprovacao': 'write-with-approval',
+};
+const SELECTIONS = { explicita: 'explicit', recente: 'recent', relevante: 'relevant', mista: 'mixed' };
+const ON_UNAVAILABLE = { parar: 'stop', fallback: 'fallback', 'seguir-com-lacuna': 'continue-with-gap' };
+const PROVENANCE = { 'por-afirmacao': 'per-claim', 'por-item': 'per-item' };
+
+// Derivações documentadas: o que o protocolo exige e a nota não declara campo a campo.
+const DEFAULT_CONFLICT_POLICY = 'a casa da verdade da fonte vence; divergência sem autoridade fica declarada como lacuna no output';
+const DEFAULT_READ_PERMISSION = 'as fontes declaradas neste Sistema';
+const DEFAULT_WRITE_PERMISSION = 'o output e o recibo locais deste Sistema';
+const RETRIEVAL_VERSION = '0.1.0';
+const EVAL_VERSION = '0.1.0';
+const CONTEXT_BUDGET_UNIT = 'items';
+
+const SYSTEM_FIELDS = [
+  'system_id', 'nome', 'versao', 'status', 'area', 'area_confirmada', 'resultado', 'nao_sucesso',
+  'entrega', 'pronto_quando', 'dono', 'gate_humano', 'gatilho', 'quando', 'capacidade',
+  'capacidade_versao', 'capacidade_origem', 'entidades', 'fontes', 'etapas', 'gates',
+  'perguntas_humanas', 'medida', 'conflito', 'paradas', 'fallback', 'itens_maximos',
+  'itens_por_fonte', 'evidencia_por', 'leitura', 'escrita', 'acoes_externas', 'limiar_promocao',
+  'procedimento',
+];
+
+const SYSTEM_FIELD_BY_PATH = {
+  protocol_version: 'system_id',
+  system_id: 'system_id',
+  name: 'nome',
+  version: 'versao',
+  status: 'status',
+  'result.statement': 'resultado',
+  'result.non_success': 'nao_sucesso',
+  'result.output_type': 'entrega',
+  'result.definition_of_done': 'pronto_quando',
+  'result.owner': 'dono',
+  'result.human_gate': 'gate_humano',
+  'trigger.type': 'gatilho',
+  'trigger.description': 'quando',
+  'capability.capability_id': 'capacidade',
+  'capability.version': 'capacidade_versao',
+  'capability.origin': 'capacidade_origem',
+  entities: 'entidades',
+  'entities.type': 'entidades',
+  'entities.role': 'entidades',
+  'entities.required': 'entidades',
+  sources: 'fontes',
+  'sources.role': 'fontes',
+  'sources.source_id': 'fontes',
+  'sources.required': 'fontes',
+  'sources.access': 'fontes',
+  'sources.freshness': 'fontes',
+  'sources.purpose': 'fontes',
+  'retrieval.source_roles': 'fontes',
+  'retrieval.source_roles.role': 'fontes',
+  'retrieval.source_roles.priority': 'fontes',
+  'retrieval.source_roles.selection': 'fontes',
+  'retrieval.source_roles.filters': 'fontes',
+  'retrieval.source_roles.window': 'fontes',
+  'retrieval.source_roles.required_freshness': 'fontes',
+  'retrieval.source_roles.on_unavailable': 'fontes',
+  'retrieval.conflict_policy': 'conflito',
+  'retrieval.fallback.order': 'fallback',
+  'retrieval.stop_conditions': 'paradas',
+  'retrieval.context_budget.maximum': 'itens_maximos',
+  'retrieval.context_budget.per_source_maximum': 'itens_por_fonte',
+  'retrieval.evidence.provenance': 'evidencia_por',
+  pipeline: 'etapas',
+  'pipeline.state': 'etapas',
+  'pipeline.input': 'etapas',
+  'pipeline.output': 'etapas',
+  'pipeline.gate': 'etapas',
+  'permissions.read': 'leitura',
+  'permissions.write': 'escrita',
+  'permissions.external_actions': 'acoes_externas',
+  'eval.deterministic_gates': 'gates',
+  'eval.human_questions': 'perguntas_humanas',
+  'eval.outcome_measure': 'medida',
+  'learning.promotion_threshold': 'limiar_promocao',
+  'extensions.operating_area': 'area',
+  system_contract: 'type',
+};
+
+function flag(data, field, errors, fallback) {
+  const raw = single(data[field]);
+  if (!raw) return fallback;
+  if (!(raw in TRUTH_FLAGS)) {
+    errors.push(problem(field, 'valor inválido; use sim ou nao'));
+    return fallback;
+  }
+  return TRUTH_FLAGS[raw];
+}
+
+function count(data, field, errors, fallback, minimum) {
+  const raw = single(data[field]);
+  if (!raw) return fallback;
+  const value = Number(raw);
+  if (!Number.isInteger(value) || value < minimum) {
+    errors.push(problem(field, `precisa ser inteiro >= ${minimum}`));
+    return fallback;
+  }
+  return value;
+}
+
+function nested(item, key) {
+  const raw = item?.[key];
+  return raw === undefined || raw === null ? '' : String(Array.isArray(raw) ? raw[0] || '' : raw).trim();
+}
+
+function nestedChoice(item, key, table, field, label, errors, fallback) {
+  const raw = nested(item, key);
+  if (!raw) return fallback;
+  if (!(raw in table)) {
+    errors.push(problem(field, `${label}: ${key} inválido; use ${Object.keys(table).join(', ')}`));
+    return fallback;
+  }
+  return table[raw];
+}
+
+// System → System Contract v2. A nota declara o resultado, o gatilho, a área, as fontes
+// (por wikilink para a nota DataSource), as etapas e os gates; o bloco `retrieval` do
+// protocolo é derivado das fontes declaradas, com as regras descritas em `type/system.md`.
+function mapSystem(data, { sourceIds = new Map(), areaSlugs = null } = {}) {
+  const errors = refuseValues(data, SYSTEM_FIELDS);
+  const systemId = required(data, 'system_id', errors);
+  if (systemId && !ID_RE.test(systemId)) {
+    errors.push(problem('system_id', 'id precisa ser kebab-case minúsculo (ex.: daily)'));
+  }
+  const name = required(data, 'nome', errors);
+  const version = single(data.versao) || '0.1.0';
+  if (!VERSION_RE.test(version)) errors.push(problem('versao', 'precisa ser semver (ex.: 0.1.0)'));
+  const status = choice(data, 'status', SYSTEM_STATUSES, errors);
+
+  const areaRaw = required(data, 'area', errors);
+  const area = areaRaw ? slug(areaRaw) : '';
+  if (area && !ID_RE.test(area)) {
+    errors.push(problem('area', 'o alvo do wikilink precisa ser kebab-case minúsculo'));
+  } else if (area && areaSlugs && areaSlugs.size && !areaSlugs.has(area)) {
+    errors.push(problem('area', `nenhuma nota de área chamada "${area}" neste vault`));
+  }
+  const areaConfirmed = flag(data, 'area_confirmada', errors, true);
+
+  const statement = required(data, 'resultado', errors);
+  const nonSuccess = required(data, 'nao_sucesso', errors);
+  const outputType = required(data, 'entrega', errors);
+  if (outputType && !ID_RE.test(outputType)) {
+    errors.push(problem('entrega', 'precisa ser kebab-case minúsculo (ex.: daily-note)'));
+  }
+  const done = required(data, 'pronto_quando', errors);
+  const ownerRaw = required(data, 'dono', errors);
+  const gate = required(data, 'gate_humano', errors);
+
+  const triggerType = choice(data, 'gatilho', TRIGGER_TYPES, errors);
+  const when = required(data, 'quando', errors);
+
+  const capabilityId = single(data.capacidade) || systemId;
+  if (capabilityId && !ID_RE.test(capabilityId)) {
+    errors.push(problem('capacidade', 'precisa ser kebab-case minúsculo'));
+  }
+  const capabilityVersion = single(data.capacidade_versao) || version;
+  if (!VERSION_RE.test(capabilityVersion)) {
+    errors.push(problem('capacidade_versao', 'precisa ser semver (ex.: 0.1.0)'));
+  }
+  const originRaw = single(data.capacidade_origem);
+  let origin = 'local';
+  if (originRaw) {
+    if (!(originRaw in CAPABILITY_ORIGINS)) {
+      errors.push(problem('capacidade_origem', `valor inválido; use ${Object.keys(CAPABILITY_ORIGINS).join(', ')}`));
+    } else origin = CAPABILITY_ORIGINS[originRaw];
+  }
+
+  const entities = objects(data.entidades).map((item, index) => {
+    const label = `item ${index + 1}`;
+    const type = nested(item, 'tipo');
+    const role = nested(item, 'papel');
+    if (!ID_RE.test(type)) errors.push(problem('entidades', `${label}: tipo precisa ser kebab-case minúsculo`));
+    if (!ID_RE.test(role)) errors.push(problem('entidades', `${label}: papel precisa ser kebab-case minúsculo`));
+    return {
+      type,
+      role,
+      required: nestedChoice(item, 'obrigatoria', TRUTH_FLAGS, 'entidades', label, errors, false),
+    };
+  });
+
+  const declared = objects(data.fontes);
+  if (!declared.length) {
+    errors.push(problem('fontes', 'declare pelo menos uma fonte com papel, fonte, frescor e finalidade'));
+  }
+  const roles = new Set();
+  const sources = [];
+  const sourceRoles = [];
+  for (const [index, item] of declared.entries()) {
+    const label = `item ${index + 1}`;
+    const role = nested(item, 'papel');
+    if (!ID_RE.test(role)) {
+      errors.push(problem('fontes', `${label}: papel precisa ser kebab-case minúsculo`));
+    } else if (roles.has(role)) {
+      errors.push(problem('fontes', `${label}: papel "${role}" repetido`));
+    }
+    roles.add(role);
+
+    const reference = nested(item, 'fonte');
+    let sourceId = null;
+    if (!reference) {
+      errors.push(problem('fontes', `${label}: fonte obrigatória e vazia`));
+    } else {
+      const target = slug(reference);
+      sourceId = sourceIds.get(target) || null;
+      if (!sourceId) {
+        errors.push(problem('fontes', `${label}: a fonte "${target}" não tem nota DataSource com source_id neste vault`));
+      }
+    }
+
+    const isRequired = nestedChoice(item, 'obrigatoria', TRUTH_FLAGS, 'fontes', label, errors, false);
+    const access = nestedChoice(item, 'acesso', SOURCE_ACCESS, 'fontes', label, errors, 'read-only');
+    const freshness = nested(item, 'frescor');
+    if (!freshness) errors.push(problem('fontes', `${label}: frescor obrigatório e vazio`));
+    const purpose = nested(item, 'finalidade');
+    if (!purpose) errors.push(problem('fontes', `${label}: finalidade obrigatória e vazia`));
+
+    sources.push({ role, source_id: sourceId, required: isRequired, access, freshness, purpose });
+    sourceRoles.push({
+      role,
+      priority: index + 1,
+      selection: nestedChoice(item, 'selecao', SELECTIONS, 'fontes', label, errors, 'recent'),
+      filters: values(item.filtros),
+      window: nested(item, 'janela') || freshness,
+      required_freshness: freshness,
+      on_unavailable: nestedChoice(
+        item, 'se_faltar', ON_UNAVAILABLE, 'fontes', label, errors,
+        isRequired ? 'stop' : 'continue-with-gap',
+      ),
+    });
+  }
+
+  const fallbackOrder = values(data.fallback).map((item) => slug(item));
+  for (const role of fallbackOrder) {
+    if (!roles.has(role)) errors.push(problem('fallback', `"${role}" não é papel de nenhuma fonte declarada`));
+  }
+
+  const pipeline = objects(data.etapas).map((item, index) => {
+    const label = `item ${index + 1}`;
+    const state = nested(item, 'estado');
+    if (!ID_RE.test(state)) errors.push(problem('etapas', `${label}: estado precisa ser kebab-case minúsculo`));
+    for (const [key, field] of [['entrada', 'entrada'], ['saida', 'saída'], ['gate', 'gate']]) {
+      if (!nested(item, key)) errors.push(problem('etapas', `${label}: ${field} obrigatória e vazia`));
+    }
+    return {
+      state,
+      input: nested(item, 'entrada'),
+      output: nested(item, 'saida'),
+      gate: nested(item, 'gate'),
+    };
+  });
+  if (!pipeline.length) errors.push(problem('etapas', 'declare pelo menos uma etapa com estado, entrada, saida e gate'));
+
+  const gates = values(data.gates);
+  if (!gates.length) errors.push(problem('gates', 'declare pelo menos um gate determinístico'));
+  const questions = values(data.perguntas_humanas);
+  if (!questions.length) errors.push(problem('perguntas_humanas', 'declare pelo menos uma pergunta de julgamento'));
+  const measure = required(data, 'medida', errors);
+
+  const stops = values(data.paradas);
+  if (!stops.length) errors.push(problem('paradas', 'declare pelo menos uma condição de parada'));
+
+  const maximum = count(data, 'itens_maximos', errors, 120, 1);
+  const perSource = single(data.itens_por_fonte) ? count(data, 'itens_por_fonte', errors, null, 1) : null;
+  if (Number.isInteger(perSource) && perSource > maximum) {
+    errors.push(problem('itens_por_fonte', 'não pode exceder itens_maximos'));
+  }
+  const provenanceRaw = single(data.evidencia_por);
+  let provenance = 'per-claim';
+  if (provenanceRaw) {
+    if (!(provenanceRaw in PROVENANCE)) {
+      errors.push(problem('evidencia_por', `valor inválido; use ${Object.keys(PROVENANCE).join(', ')}`));
+    } else provenance = PROVENANCE[provenanceRaw];
+  }
+
+  const externalActions = flag(data, 'acoes_externas', errors, false);
+  const threshold = count(data, 'limiar_promocao', errors, 3, 3);
+
+  const procedureRaw = single(data.procedimento);
+  const procedure = procedureRaw ? slug(procedureRaw) : null;
+  if (procedure && !REF_RE.test(procedure)) {
+    errors.push(problem('procedimento', 'o alvo do wikilink precisa ser um slug simples'));
+  }
+
+  if (errors.length) return { errors };
+
+  return {
+    errors: [],
+    contract: {
+      protocol_version: 2,
+      system_id: systemId,
+      name,
+      version,
+      status,
+      result: {
+        statement,
+        non_success: nonSuccess,
+        output_type: outputType,
+        definition_of_done: done,
+        owner: slug(ownerRaw),
+        human_gate: gate,
+      },
+      trigger: { type: triggerType, description: when },
+      capability: { capability_id: capabilityId, version: capabilityVersion, origin },
+      entities,
+      sources,
+      retrieval: {
+        version: RETRIEVAL_VERSION,
+        source_roles: sourceRoles,
+        conflict_policy: single(data.conflito) || DEFAULT_CONFLICT_POLICY,
+        fallback: {
+          enabled: fallbackOrder.length > 0,
+          order: fallbackOrder,
+          on_exhausted: 'continue-with-gap',
+        },
+        stop_conditions: stops,
+        context_budget: { unit: CONTEXT_BUDGET_UNIT, maximum, per_source_maximum: perSource },
+        // Evidência é obrigatória em todo Sistema deste cérebro: afirmação sem
+        // proveniência é opinião da IA, não resultado.
+        evidence: { required: true, provenance, minimum_refs: 1 },
+      },
+      pipeline,
+      permissions: {
+        read: values(data.leitura).length ? values(data.leitura) : [DEFAULT_READ_PERMISSION],
+        write: values(data.escrita).length ? values(data.escrita) : [DEFAULT_WRITE_PERMISSION],
+        external_actions: externalActions,
+      },
+      eval: {
+        version: EVAL_VERSION,
+        deterministic_gates: gates,
+        human_questions: questions,
+        outcome_measure: measure,
+        baseline: null,
+      },
+      learning: {
+        correction_policy: 'candidate-first',
+        promotion_threshold: threshold,
+        requires_replay: true,
+        requires_human_approval: true,
+      },
+      // Chaves de extensão permitidas neste compilador. `operating_area` é o slug da nota
+      // de área do vault, que o Console soma às áreas do vault em Estrutura › Áreas.
+      extensions: {
+        operating_area: area,
+        operating_area_status: areaConfirmed ? 'confirmed' : 'to-confirm',
+        product_kind: 'business-system',
+        surface: 'systems',
+        procedure_ref: procedure,
+        vault_note_ref: null,
+        vault_note_type: 'System',
+      },
+    },
+  };
+}
+
 export const VAULT_CONTRACT_TYPES = [
   {
     noteType: 'DataSource',
@@ -292,7 +677,20 @@ export const VAULT_CONTRACT_TYPES = [
     map: mapDataSource,
     validate: validateSourceContract,
     idOf: (contract) => contract.source_id,
+    idField: 'source_id',
     fieldByPath: DATA_SOURCE_FIELD_BY_PATH,
+  },
+  {
+    noteType: 'System',
+    label: 'sistema',
+    layoutKey: 'systemContracts',
+    defaultDirectory: join('.cerebro', 'contracts', 'systems'),
+    map: mapSystem,
+    validate: validateSystemContract,
+    idOf: (contract) => contract.system_id,
+    idField: 'system_id',
+    objectListFields: ['fontes', 'etapas', 'entidades'],
+    fieldByPath: SYSTEM_FIELD_BY_PATH,
   },
 ];
 
@@ -300,7 +698,7 @@ export const VAULT_CONTRACT_TYPES = [
 // nota mais motivo, para que o dono corrija a nota sem abrir o JSON.
 function translate(message, fieldByPath) {
   const [path, ...rest] = String(message).split(' ');
-  const normalized = path.replace(/\[\d+\]/g, '').replace(/^source_contract\./, '');
+  const normalized = path.replace(/\[\d+\]/g, '').replace(/^(?:source|system)_contract\./, '');
   return problem(fieldByPath[normalized] || normalized || 'contrato', rest.join(' ') || 'inválido');
 }
 
@@ -337,12 +735,48 @@ function isDraft(path) {
 
 // Notas do vault com um dos types compiláveis. Ignora pasta oculta e node_modules
 // (herdado da varredura do read model), e devolve o caminho relativo à raiz do Cérebro.
-function typedNotes(root, knowledgeRoot, noteTypes) {
+function typedNotes(root, knowledgeRoot, noteTypes, objectLists) {
   const prefix = knowledgeRoot && knowledgeRoot !== '.' ? `${posix(knowledgeRoot)}/` : '';
   return knowledgeNotes(root, knowledgeRoot || '.')
-    .map((note) => ({ ...note, path: `${prefix}${posix(note.relative)}`, data: parseFrontmatter(note.content) }))
+    .map((note) => ({
+      ...note,
+      path: `${prefix}${posix(note.relative)}`,
+      slug: note.relative.slice(note.relative.lastIndexOf('/') + 1, -3),
+      data: parseFrontmatter(note.content, { objectLists }),
+    }))
     .filter((note) => noteTypes.has(String(note.data.type || '').trim()) && !isDraft(note.path))
     .sort((left, right) => left.path.localeCompare(right.path));
+}
+
+// Fonte declarada numa nota de Sistema é wikilink para a nota DataSource. O compilador
+// resolve o alvo (slug do arquivo, ou o próprio source_id) no id do contrato dela; alvo
+// sem nota correspondente vira erro legível, nunca contrato com fonte inventada.
+function sourceIdIndex(notes) {
+  const index = new Map();
+  for (const note of notes) {
+    if (String(note.data.type || '').trim() !== 'DataSource') continue;
+    const id = single(note.data.source_id);
+    if (!id || !ID_RE.test(id)) continue;
+    index.set(note.slug, id);
+    index.set(id, id);
+  }
+  return index;
+}
+
+// Slugs das notas de área do vault, para recusar `area:` que aponta para o nada. Vault
+// sem pasta de áreas declarada não ganha a checagem.
+function areaSlugIndex(root, config) {
+  const folder = config?.vault?.areas;
+  if (typeof folder !== 'string' || !folder || isAbsolute(folder)) return null;
+  const directory = insideRoot(root, folder, '');
+  if (directory === resolve(root) || !existsSync(directory)) return null;
+  try {
+    return new Set(readdirSync(directory, { withFileTypes: true })
+      .filter((entry) => entry.isFile() && entry.name.endsWith('.md') && !entry.name.startsWith('.') && !entry.name.startsWith('_'))
+      .map((entry) => entry.name.slice(0, -3)));
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -359,7 +793,9 @@ export function compileVaultContracts(root, { confirm = false, now = new Date() 
   }
   const config = layout(base);
   const byType = new Map(VAULT_CONTRACT_TYPES.map((compiler) => [compiler.noteType, compiler]));
-  const notes = typedNotes(base, config.knowledgeRoot || '.', new Set(byType.keys()));
+  const objectLists = [...new Set(VAULT_CONTRACT_TYPES.flatMap((compiler) => compiler.objectListFields || []))];
+  const notes = typedNotes(base, config.knowledgeRoot || '.', new Set(byType.keys()), objectLists);
+  const context = { sourceIds: sourceIdIndex(notes), areaSlugs: areaSlugIndex(base, config) };
 
   const results = [];
   const owned = new Map();
@@ -374,7 +810,7 @@ export function compileVaultContracts(root, { confirm = false, now = new Date() 
       results.push({ path: note.path, type: compiler.noteType, status: 'error', errors: [problem('arquivo', 'nota ilegível')] });
       continue;
     }
-    const mapped = compiler.map(note.data, { previous: null, now });
+    const mapped = compiler.map(note.data, { ...context, previous: null, now });
     let errors = mapped.errors;
     let contract = mapped.contract || null;
     let contractRef = null;
@@ -386,11 +822,11 @@ export function compileVaultContracts(root, { confirm = false, now = new Date() 
       const previous = existsSync(contractPath) ? readRegistryContract(contractPath) : null;
       // Recompilar não pode mexer na observação: ela vem do `updated` da nota ou do
       // valor já gravado.
-      contract = compiler.map(note.data, { previous, now }).contract;
+      contract = compiler.map(note.data, { ...context, previous, now }).contract;
       contract.extensions.vault_note_ref = note.path;
       const duplicate = seen.get(contractRef);
       if (duplicate) {
-        errors = [problem('source_id', `id já usado por ${duplicate}`)];
+        errors = [problem(compiler.idField, `id já usado por ${duplicate}`)];
       } else {
         seen.set(contractRef, note.path);
         errors = compiler.validate(contract).map((message) => translate(message, compiler.fieldByPath));
