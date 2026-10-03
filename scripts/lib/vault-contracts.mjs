@@ -1,10 +1,9 @@
 // Compilador de notas tipadas do vault em contratos do protocolo.
 //
-// O dono descreve Fontes e Sistemas (e, no próximo ticket, Rotinas) como notas
-// Markdown com frontmatter em português. Este módulo lê essas notas, mapeia os campos
-// para os contratos do protocolo, valida com os validadores que já existem e grava o
-// JSON nos caminhos declarados pelo layout do Cérebro. A nota é a fonte da verdade; o
-// JSON é artefato gerado.
+// O dono descreve Fontes, Sistemas e Rotinas como notas Markdown com frontmatter em
+// português. Este módulo lê essas notas, mapeia os campos para os contratos do protocolo,
+// valida com os validadores que já existem e grava o JSON nos caminhos declarados pelo
+// layout do Cérebro. A nota é a fonte da verdade; o JSON é artefato gerado.
 //
 // Regras que o módulo garante:
 // - simula por padrão: só grava com `confirm`;
@@ -15,19 +14,25 @@
 // - mantém `.cerebro/compiled.json` com os arquivos que gerou e remove só os próprios
 //   órfãos; contrato escrito por outra ferramenta nunca é tocado.
 //
-// Para estender: acrescente uma entrada em VAULT_CONTRACT_TYPES com o type da nota, a
-// chave de layout, o mapeador, o validador e o mapa de campo reverso.
+// Para estender: acrescente uma entrada em VAULT_CONTRACT_TYPES com o type da nota, o
+// mapeador e um descritor por artefato gerado (chave de layout, validador e mapa de campo
+// reverso). Uma nota pode gerar mais de um artefato — a de Rotina gera três tipos.
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync } from 'node:fs';
 import { isAbsolute, join, resolve, sep } from 'node:path';
 import {
-  VERSION_RE, layout, readJson, validateSourceContract, validateSystemContract, writeJsonAtomic,
+  VERSION_RE, layout, readJson, validateAccessGrant, validateSourceContract,
+  validateSystemContract, writeJsonAtomic,
 } from './system-protocol.mjs';
+import { validateExecutorBinding, validateRoutineContract } from './routine-protocol.mjs';
 import { parseFrontmatter } from './vault-today.mjs';
 import { knowledgeNotes } from './vault-read-model.mjs';
 
 const ID_RE = /^[a-z0-9][a-z0-9-]{0,63}$/;
 const REF_RE = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const TIME_RE = /^(?:[01][0-9]|2[0-3]):[0-5][0-9]$/;
+// Mesmo `local_ref` do protocolo: caminho ou identificador, nunca `..` nem caminho vazio.
+const LOCAL_REF_RE = /^(?!\.?\.?$)(?!\.\.?\/)(?!.*\/\.\.(?:\/|$))[A-Za-z0-9.][A-Za-z0-9_./:-]{0,255}$/;
 export const REGISTRY_REF = join('.cerebro', 'compiled.json');
 
 // Valor que parece dado pessoal ou segredo nunca entra num contrato. O CNPJ é testado
@@ -183,6 +188,24 @@ function refuseValues(data, fields) {
     }
   }
   return errors;
+}
+
+// Data da nota (`2026-07-06`) vira instante do contrato. Sem data reconhecível, devolve
+// null: campo de data inválido vira erro legível, nunca instante inventado.
+function stamp(value) {
+  const text = String(value || '').trim();
+  if (DATE_RE.test(text)) return `${text}T00:00:00.000Z`;
+  if (text && Number.isFinite(Date.parse(text))) return new Date(text).toISOString();
+  return null;
+}
+
+function validTimezone(value) {
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: value }).format(new Date());
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function observedAt(data, previous, now) {
@@ -409,6 +432,18 @@ function count(data, field, errors, fallback, minimum) {
   const value = Number(raw);
   if (!Number.isInteger(value) || value < minimum) {
     errors.push(problem(field, `precisa ser inteiro >= ${minimum}`));
+    return fallback;
+  }
+  return value;
+}
+
+// Inteiro dentro de uma faixa fechada do protocolo (timeout, tentativas, espera).
+function ranged(data, field, errors, fallback, minimum, maximum) {
+  const raw = single(data[field]);
+  if (!raw) return fallback;
+  const value = Number(raw);
+  if (!Number.isInteger(value) || value < minimum || value > maximum) {
+    errors.push(problem(field, `precisa ser inteiro entre ${minimum} e ${maximum}`));
     return fallback;
   }
   return value;
@@ -668,29 +703,537 @@ function mapSystem(data, { sourceIds = new Map(), areaSlugs = null } = {}) {
   };
 }
 
+// ── Routine → Routine Contract + Access Grant(s) + executor binding ──────────────────
+
+const ROUTINE_LIFECYCLES = { Rascunho: 'draft', Aprovada: 'approved', Aposentada: 'retired' };
+const ROUTINE_TRIGGERS = { agendado: 'schedule', manual: 'manual' };
+const CADENCES = { diaria: 'daily', diária: 'daily', semanal: 'weekly', mensal: 'monthly' };
+const WEEKDAYS = {
+  domingo: 'SU', segunda: 'MO', terca: 'TU', terça: 'TU', quarta: 'WE',
+  quinta: 'TH', sexta: 'FR', sabado: 'SA', sábado: 'SA',
+};
+const WEEKDAY_NAMES = 'domingo, segunda, terca, quarta, quinta, sexta, sabado';
+const MISSED_RUNS = { 'rodar-ao-acordar': 'run-on-wake', pular: 'skip' };
+// Onde a rotina roda. `nuvem` é o agente de nuvem da Claude; `local` é a máquina do dono.
+const HOSTS = { nuvem: 'host-claude-cloud', local: 'host-owner-local' };
+const ROUTINE_PERMISSIONS = { leitura: 'read-only', 'escrita-no-espaco': 'workspace-write' };
+const DESTINATIONS = { 'arquivo-local': 'local-file', 'saida-runtime': 'runtime-output' };
+const REQUEST_MODES = { leitura: 'read', proposta: 'propose', 'escrita-com-aprovacao': 'write-with-approval' };
+const EFFORTS = {
+  baixo: 'low', medio: 'medium', médio: 'medium', alto: 'high',
+  'muito-alto': 'xhigh', maximo: 'max', máximo: 'max',
+};
+const AUTH_STATUSES = {
+  pronta: 'ready', ausente: 'missing', 'exige-login': 'authentication-required', degradada: 'degraded',
+};
+
+// Derivações documentadas da Rotina (ver `type/routine.md` no vault).
+const DEFAULT_MODEL = 'padrao-da-conta';
+const DEFAULT_EFFORT = 'medium';
+const DEFAULT_AUTH = 'ready';
+const DEFAULT_TIMEOUT_SECONDS = 1800;
+const DEFAULT_ATTEMPTS = 1;
+const DEFAULT_BACKOFF_SECONDS = 60;
+const ROUTINE_ADAPTER = 'claude-code';
+
+const ROUTINE_FIELDS = [
+  'routine_id', 'nome', 'versao', 'status', 'sistema', 'host', 'espaco', 'gatilho',
+  'cadencia', 'hora', 'fuso', 'dias_da_semana', 'dias_do_mes', 'vigente_desde', 'se_perder',
+  'gatilho_externo', 'instrucao', 'skills', 'modelo', 'esforco', 'autenticacao', 'permissao',
+  'destino_tipo', 'destino', 'tempo_limite_segundos', 'tentativas', 'espera_segundos',
+  'motivo_do_acesso', 'acessos', 'aprovado_por', 'aprovado_em', 'updated',
+];
+
+// Caminho do contrato → campo da nota, para os três validadores que a Rotina atravessa.
+const ROUTINE_FIELD_BY_PATH = {
+  protocol_version: 'routine_id',
+  routine_id: 'routine_id',
+  version: 'versao',
+  name: 'nome',
+  lifecycle: 'status',
+  routine: 'status',
+  system_ref: 'sistema',
+  'trigger.type': 'gatilho',
+  'trigger.schedule': 'cadencia',
+  'trigger.schedule.cadence': 'cadencia',
+  cadência: 'cadencia',
+  'trigger.schedule.time': 'hora',
+  'trigger.schedule.timezone': 'fuso',
+  'trigger.schedule.weekdays': 'dias_da_semana',
+  weekdays: 'dias_da_semana',
+  'trigger.schedule.month_days': 'dias_do_mes',
+  month_days: 'dias_do_mes',
+  'trigger.schedule.not_before': 'vigente_desde',
+  'trigger.schedule.missed_run_policy': 'se_perder',
+  missed_run_policy: 'se_perder',
+  'placement.host_ref': 'host',
+  'placement.workspace_ref': 'espaco',
+  'executor.binding_ref': 'routine_id',
+  'executor.requested_model': 'modelo',
+  'executor.reasoning_effort': 'esforco',
+  'context.prompt_ref': 'instrucao',
+  'context.skill_refs': 'skills',
+  'context.access_requests': 'acessos',
+  'context.access_requests.grant_ref': 'acessos',
+  'context.access_requests.source_ref': 'acessos',
+  'context.access_requests.action': 'acessos',
+  'context.access_requests.mode': 'acessos',
+  'write-with-approval': 'permissao',
+  permission_mode: 'permissao',
+  'destination.kind': 'destino_tipo',
+  'destination.ref': 'destino',
+  'operations.timeout_seconds': 'tempo_limite_segundos',
+  'operations.concurrency': 'routine_id',
+  'retry.max_attempts': 'tentativas',
+  'retry.backoff_seconds': 'espera_segundos',
+  'retry.idempotency_scope': 'routine_id',
+  'approval.required_before_schedule': 'status',
+  'approval.approved_by': 'aprovado_por',
+  'approval.approved_at': 'aprovado_em',
+  privacy: 'routine_id',
+  // Access Grant.
+  grant_id: 'acessos',
+  grant: 'acessos',
+  'subject.type': 'sistema',
+  'subject.ref': 'sistema',
+  'scope.company_ref': 'sistema',
+  'scope.unit_ref': 'sistema',
+  'scope.system_refs': 'sistema',
+  'scope.source_refs': 'acessos',
+  'scope.actions': 'acessos',
+  mode: 'acessos',
+  assurance: 'acessos',
+  custody: 'acessos',
+  reason: 'motivo_do_acesso',
+  issued_at: 'aprovado_em',
+  expires_at: 'aprovado_em',
+  revoked_at: 'aprovado_em',
+  approved_by: 'aprovado_por',
+  credential_ref: 'acessos',
+  'receipts.use_refs': 'acessos',
+  // Executor binding.
+  binding_id: 'routine_id',
+  adapter: 'host',
+  host_ref: 'host',
+  workspace_ref: 'espaco',
+  workspace_path: 'espaco',
+  'auth.type': 'autenticacao',
+  'auth.status': 'autenticacao',
+  'model_policy.default_model': 'modelo',
+  'model_policy.allowed_models': 'modelo',
+  permission_profile: 'permissao',
+  observed_at: 'updated',
+  routine_contract: 'type',
+  access_grant: 'type',
+  executor_binding: 'type',
+};
+
+// Caminho relativo que fica dentro do vault e aponta para arquivo que existe. O protocolo
+// aceita qualquer `local_ref`, mas rotina com instrução inexistente é promessa vazia.
+function vaultFile(data, field, errors, { root, label = null, value = null }) {
+  const reference = value === null ? single(data[field]) : value;
+  const name = label ? `${label}: ` : '';
+  if (!LOCAL_REF_RE.test(reference) || isAbsolute(reference)
+    || reference.split(/[\\/]/).includes('..')) {
+    errors.push(problem(field, `${name}precisa ser um caminho relativo dentro do vault (ex.: .claude/skills/daily/SKILL.md)`));
+    return null;
+  }
+  if (root && !existsSync(join(root, reference))) {
+    errors.push(problem(field, `${name}arquivo não encontrado no vault: ${reference}`));
+    return null;
+  }
+  return reference;
+}
+
+// Routine → Routine Contract v1 + um Access Grant por acesso declarado + executor binding.
+// A nota declara o Sistema que a rotina executa (wikilink), a agenda, onde roda, o que lê
+// e escreve, e quem aprovou. Nada aqui executa modelo: o contrato é declaração, e é o
+// Console que lê o que foi declarado.
+function mapRoutine(data, {
+  sourceIds = new Map(), systemIndex = new Map(), root = null,
+} = {}) {
+  const errors = refuseValues(data, ROUTINE_FIELDS);
+  const routineId = required(data, 'routine_id', errors);
+  if (routineId && !ID_RE.test(routineId)) {
+    errors.push(problem('routine_id', 'id precisa ser kebab-case minúsculo (ex.: daily-nuvem)'));
+  }
+  const name = required(data, 'nome', errors);
+  const version = single(data.versao) || '0.1.0';
+  if (!VERSION_RE.test(version)) errors.push(problem('versao', 'precisa ser semver (ex.: 0.1.0)'));
+  const lifecycle = choice(data, 'status', ROUTINE_LIFECYCLES, errors);
+
+  // O Sistema é o que a rotina executa, e é dele que o grant herda sujeito e escopo.
+  const systemRaw = required(data, 'sistema', errors);
+  let systemRef = null;
+  let companyRef = null;
+  if (systemRaw) {
+    const target = slug(systemRaw);
+    const system = systemIndex.get(target) || null;
+    if (!system) {
+      errors.push(problem('sistema', `nenhuma nota System com system_id "${target}" neste vault`));
+    } else {
+      systemRef = system.systemId;
+      companyRef = system.area || null;
+    }
+  }
+
+  const host = choice(data, 'host', HOSTS, errors);
+  const workspace = required(data, 'espaco', errors);
+  if (workspace && !REF_RE.test(workspace)) {
+    errors.push(problem('espaco', 'precisa ser um slug simples (letras, números, - ou _)'));
+  }
+
+  const triggerType = choice(data, 'gatilho', ROUTINE_TRIGGERS, errors);
+  let schedule = null;
+  if (triggerType === 'schedule') {
+    const cadence = choice(data, 'cadencia', CADENCES, errors);
+    const time = required(data, 'hora', errors);
+    if (time && !TIME_RE.test(time)) {
+      errors.push(problem('hora', 'precisa ser HH:MM em relógio de 24 horas (ex.: 06:53)'));
+    }
+    const timezone = required(data, 'fuso', errors);
+    if (timezone && !validTimezone(timezone)) {
+      errors.push(problem('fuso', 'fuso inválido; use um nome IANA (ex.: America/Maceio)'));
+    }
+
+    const weekdays = [];
+    for (const raw of values(data.dias_da_semana)) {
+      const code = WEEKDAYS[raw.trim().toLowerCase()];
+      if (!code) errors.push(problem('dias_da_semana', `"${raw}" não é dia da semana; use ${WEEKDAY_NAMES}`));
+      else if (weekdays.includes(code)) errors.push(problem('dias_da_semana', `"${raw}" repetido`));
+      else weekdays.push(code);
+    }
+    const monthDays = [];
+    for (const raw of values(data.dias_do_mes)) {
+      const day = Number(raw);
+      if (!Number.isInteger(day) || day < 1 || day > 28) {
+        errors.push(problem('dias_do_mes', `"${raw}" precisa ser inteiro entre 1 e 28`));
+      } else if (monthDays.includes(day)) errors.push(problem('dias_do_mes', `"${raw}" repetido`));
+      else monthDays.push(day);
+    }
+    if (cadence === 'weekly' && !weekdays.length) {
+      errors.push(problem('dias_da_semana', 'cadência semanal exige pelo menos um dia da semana'));
+    }
+    if (cadence && cadence !== 'weekly' && weekdays.length) {
+      errors.push(problem('dias_da_semana', 'só a cadência semanal tem dias da semana'));
+    }
+    if (cadence === 'monthly' && !monthDays.length) {
+      errors.push(problem('dias_do_mes', 'cadência mensal exige pelo menos um dia do mês'));
+    }
+    if (cadence && cadence !== 'monthly' && monthDays.length) {
+      errors.push(problem('dias_do_mes', 'só a cadência mensal tem dias do mês'));
+    }
+
+    const sinceRaw = required(data, 'vigente_desde', errors);
+    const notBefore = stamp(sinceRaw);
+    if (sinceRaw && !notBefore) errors.push(problem('vigente_desde', 'data inválida; use YYYY-MM-DD'));
+    const missedRaw = single(data.se_perder);
+    let missed = 'run-on-wake';
+    if (missedRaw) {
+      if (!(missedRaw in MISSED_RUNS)) {
+        errors.push(problem('se_perder', `valor inválido; use ${Object.keys(MISSED_RUNS).join(', ')}`));
+      } else missed = MISSED_RUNS[missedRaw];
+    }
+    schedule = {
+      cadence,
+      time,
+      timezone,
+      weekdays,
+      month_days: monthDays,
+      not_before: notBefore,
+      missed_run_policy: missed,
+    };
+  } else if (triggerType === 'manual') {
+    for (const field of ['cadencia', 'hora', 'fuso', 'dias_da_semana', 'dias_do_mes', 'vigente_desde']) {
+      if (values(data[field]).length) errors.push(problem(field, 'gatilho manual não tem agenda'));
+    }
+  }
+
+  const model = single(data.modelo) || DEFAULT_MODEL;
+  if (!LOCAL_REF_RE.test(model)) {
+    errors.push(problem('modelo', 'precisa ser um identificador simples (ex.: padrao-da-conta)'));
+  }
+  const effortRaw = single(data.esforco);
+  let effort = DEFAULT_EFFORT;
+  if (effortRaw) {
+    if (!(effortRaw in EFFORTS)) {
+      errors.push(problem('esforco', `valor inválido; use ${Object.keys(EFFORTS).join(', ')}`));
+    } else effort = EFFORTS[effortRaw];
+  }
+  const authRaw = single(data.autenticacao);
+  let auth = DEFAULT_AUTH;
+  if (authRaw) {
+    if (!(authRaw in AUTH_STATUSES)) {
+      errors.push(problem('autenticacao', `valor inválido; use ${Object.keys(AUTH_STATUSES).join(', ')}`));
+    } else auth = AUTH_STATUSES[authRaw];
+  }
+
+  const instructionRaw = required(data, 'instrucao', errors);
+  const instruction = instructionRaw ? vaultFile(data, 'instrucao', errors, { root }) : null;
+  const skills = [];
+  for (const [index, reference] of values(data.skills).entries()) {
+    const resolved = vaultFile(data, 'skills', errors, { root, label: `item ${index + 1}`, value: reference });
+    if (resolved && skills.includes(resolved)) errors.push(problem('skills', `"${resolved}" repetido`));
+    else if (resolved) skills.push(resolved);
+  }
+
+  const permission = choice(data, 'permissao', ROUTINE_PERMISSIONS, errors);
+  const destinationKind = choice(data, 'destino_tipo', DESTINATIONS, errors);
+  const destinationRaw = required(data, 'destino', errors);
+  let destination = null;
+  if (destinationRaw) {
+    if (!LOCAL_REF_RE.test(destinationRaw) || isAbsolute(destinationRaw)
+      || destinationRaw.split(/[\\/]/).includes('..')) {
+      errors.push(problem('destino', 'precisa ser um caminho relativo dentro do Cérebro (ex.: journal)'));
+    } else destination = destinationRaw;
+  }
+
+  const timeout = ranged(data, 'tempo_limite_segundos', errors, DEFAULT_TIMEOUT_SECONDS, 10, 7200);
+  const attempts = ranged(data, 'tentativas', errors, DEFAULT_ATTEMPTS, 1, 3);
+  const backoff = ranged(data, 'espera_segundos', errors, DEFAULT_BACKOFF_SECONDS, 0, 900);
+
+  const declared = objects(data.acessos);
+  if (!declared.length) {
+    errors.push(problem('acessos', 'declare pelo menos um acesso com fonte, acao e modo'));
+  }
+  const reason = declared.length ? required(data, 'motivo_do_acesso', errors) : '';
+  const accesses = [];
+  const grantIds = new Set();
+  for (const [index, item] of declared.entries()) {
+    const label = `item ${index + 1}`;
+    const reference = nested(item, 'fonte');
+    let sourceId = null;
+    if (!reference) errors.push(problem('acessos', `${label}: fonte obrigatória e vazia`));
+    else {
+      const target = slug(reference);
+      sourceId = sourceIds.get(target) || null;
+      if (!sourceId) {
+        errors.push(problem('acessos', `${label}: a fonte "${target}" não tem nota DataSource com source_id neste vault`));
+      }
+    }
+    const action = nested(item, 'acao');
+    if (!action) errors.push(problem('acessos', `${label}: acao obrigatória e vazia`));
+    else if (!ID_RE.test(action)) {
+      errors.push(problem('acessos', `${label}: acao precisa ser kebab-case minúsculo (ex.: ler-eventos)`));
+    }
+    const modeRaw = nested(item, 'modo');
+    let mode = null;
+    if (!modeRaw) {
+      errors.push(problem('acessos', `${label}: modo obrigatório e vazio; use ${Object.keys(REQUEST_MODES).join(', ')}`));
+    } else if (!(modeRaw in REQUEST_MODES)) {
+      errors.push(problem('acessos', `${label}: modo inválido; use ${Object.keys(REQUEST_MODES).join(', ')}`));
+    } else mode = REQUEST_MODES[modeRaw];
+
+    // Um grant por acesso: o protocolo exige grant_ref único em cada pedido, e um grant
+    // por fonte e ação é o que a tela Governança audita.
+    const grantId = routineId && sourceId && action ? `grant-${routineId}-${sourceId}-${action}` : null;
+    if (grantId && !REF_RE.test(grantId)) {
+      errors.push(problem('acessos', `${label}: o id do grant ficaria longo demais; encurte routine_id, fonte ou acao`));
+    } else if (grantId && grantIds.has(grantId)) {
+      errors.push(problem('acessos', `${label}: a mesma fonte com a mesma acao já foi declarada`));
+    } else if (grantId) grantIds.add(grantId);
+    accesses.push({ grantId, sourceId, action, mode });
+  }
+  if (permission === 'read-only' && accesses.some((access) => access.mode === 'write-with-approval')) {
+    errors.push(problem('permissao', 'acesso com escrita-com-aprovacao exige permissao escrita-no-espaco'));
+  }
+
+  const approverRaw = single(data.aprovado_por);
+  const approver = approverRaw ? slug(approverRaw) : null;
+  if (approver && !REF_RE.test(approver)) {
+    errors.push(problem('aprovado_por', 'o alvo do wikilink precisa ser um slug simples (letras, números, - ou _)'));
+  }
+  const approvedAtRaw = single(data.aprovado_em);
+  const approvedAt = approvedAtRaw ? stamp(approvedAtRaw) : null;
+  if (approvedAtRaw && !approvedAt) errors.push(problem('aprovado_em', 'data inválida; use YYYY-MM-DD'));
+  if (lifecycle === 'approved' && (!approver || !approvedAt)) {
+    errors.push(problem('aprovado_por', 'rotina Aprovada exige aprovado_por e aprovado_em'));
+  }
+  if (lifecycle === 'draft' && (approver || approvedAt)) {
+    errors.push(problem('aprovado_por', 'rotina em Rascunho não pode declarar aprovação'));
+  }
+
+  // A observação do executor sai da nota, nunca do relógio: é o que mantém a recompilação
+  // idêntica.
+  const updatedRaw = required(data, 'updated', errors);
+  const observed = updatedRaw ? stamp(updatedRaw) : null;
+  if (updatedRaw && !observed) errors.push(problem('updated', 'data inválida; use YYYY-MM-DD'));
+
+  const externalTrigger = single(data.gatilho_externo) || null;
+  if (externalTrigger && !REF_RE.test(externalTrigger)) {
+    errors.push(problem('gatilho_externo', 'precisa ser um id simples (letras, números, - ou _)'));
+  }
+
+  if (errors.length) return { errors };
+
+  const bindingId = `executor-${routineId}`;
+  const contract = {
+    protocol_version: 1,
+    routine_id: routineId,
+    version,
+    name,
+    lifecycle,
+    system_ref: systemRef,
+    trigger: { type: triggerType, schedule },
+    placement: { host_ref: host, workspace_ref: workspace },
+    executor: { binding_ref: bindingId, requested_model: model, reasoning_effort: effort },
+    context: {
+      prompt_ref: instruction,
+      ...(skills.length ? { skill_refs: skills } : {}),
+      access_requests: accesses.map((access) => ({
+        grant_ref: access.grantId,
+        source_ref: access.sourceId,
+        action: access.action,
+        mode: access.mode,
+      })),
+    },
+    permission_mode: permission,
+    destination: { kind: destinationKind, ref: destination },
+    operations: {
+      timeout_seconds: timeout,
+      retry: { max_attempts: attempts, backoff_seconds: backoff, idempotency_scope: 'scheduled-slot' },
+      concurrency: 'forbid',
+    },
+    // Toda rotina deste cérebro passa por aprovação humana antes de entrar na agenda.
+    approval: {
+      required_before_schedule: true,
+      approved_by: approver,
+      approved_at: approvedAt,
+    },
+    privacy: { content_shared_with_inevita: false },
+    extensions: {
+      // Id do agendamento que roda a rotina fora do Cérebro (claude.ai), só como
+      // referência: é o que liga o contrato ao agendamento real.
+      external_trigger_ref: externalTrigger,
+      vault_note_ref: null,
+      vault_note_type: 'Routine',
+    },
+  };
+
+  // Grant sem aprovador seria aprovação inventada: rotina em Rascunho declara o pedido de
+  // acesso, mas não gera grant. O Console mostra o acesso como `missing`, que é a verdade.
+  const grants = lifecycle === 'approved' ? accesses.map((access) => ({
+    protocol_version: 1,
+    grant_id: access.grantId,
+    subject: { type: 'system', ref: systemRef },
+    scope: {
+      company_ref: companyRef || workspace,
+      unit_ref: null,
+      system_refs: [systemRef],
+      source_refs: [access.sourceId],
+      actions: [access.action],
+    },
+    mode: access.mode,
+    // O vault não guarda credencial sob custódia de runtime: o agente usa a sessão da
+    // própria conta, então a garantia é por recibo auditado, nunca runtime-enforced.
+    assurance: 'receipt-audited',
+    custody: 'agent-direct',
+    reason,
+    issued_at: approvedAt,
+    expires_at: null,
+    revoked_at: null,
+    approved_by: approver,
+    credential_ref: null,
+    receipts: { use_refs: [], revocation_ref: null },
+    extensions: {
+      routine_ref: routineId,
+      vault_note_ref: null,
+      vault_note_type: 'Routine',
+    },
+  })) : [];
+
+  const binding = {
+    protocol_version: 1,
+    binding_id: bindingId,
+    adapter: ROUTINE_ADAPTER,
+    host_ref: host,
+    workspace_ref: workspace,
+    // O espaço de trabalho da rotina é o próprio Cérebro: ela roda dentro do vault.
+    workspace_path: '.',
+    auth: { type: 'provider-session', status: auth },
+    model_policy: { default_model: model, allowed_models: [] },
+    permission_profile: permission,
+    observed_at: observed,
+    privacy: { credential_stored: false, content_shared_with_inevita: false },
+  };
+
+  return {
+    errors: [],
+    artifacts: [
+      { output: 'routine', contract },
+      ...grants.map((grant) => ({ output: 'grant', contract: grant })),
+      { output: 'executor', contract: binding },
+    ],
+  };
+}
+
 export const VAULT_CONTRACT_TYPES = [
   {
     noteType: 'DataSource',
-    label: 'fonte',
-    layoutKey: 'sourceContracts',
-    defaultDirectory: join('.cerebro', 'contracts', 'sources'),
     map: mapDataSource,
-    validate: validateSourceContract,
-    idOf: (contract) => contract.source_id,
-    idField: 'source_id',
-    fieldByPath: DATA_SOURCE_FIELD_BY_PATH,
+    outputs: {
+      primary: {
+        label: 'fonte',
+        layoutKey: 'sourceContracts',
+        defaultDirectory: join('.cerebro', 'contracts', 'sources'),
+        validate: validateSourceContract,
+        idField: 'source_id',
+        fieldByPath: DATA_SOURCE_FIELD_BY_PATH,
+      },
+    },
   },
   {
     noteType: 'System',
-    label: 'sistema',
-    layoutKey: 'systemContracts',
-    defaultDirectory: join('.cerebro', 'contracts', 'systems'),
     map: mapSystem,
-    validate: validateSystemContract,
-    idOf: (contract) => contract.system_id,
-    idField: 'system_id',
     objectListFields: ['fontes', 'etapas', 'entidades'],
-    fieldByPath: SYSTEM_FIELD_BY_PATH,
+    outputs: {
+      primary: {
+        label: 'sistema',
+        layoutKey: 'systemContracts',
+        defaultDirectory: join('.cerebro', 'contracts', 'systems'),
+        validate: validateSystemContract,
+        idField: 'system_id',
+        fieldByPath: SYSTEM_FIELD_BY_PATH,
+      },
+    },
+  },
+  {
+    noteType: 'Routine',
+    map: mapRoutine,
+    objectListFields: ['acessos'],
+    outputs: {
+      routine: {
+        label: 'rotina',
+        layoutKey: 'routineContracts',
+        defaultDirectory: join('.cerebro', 'contracts', 'routines'),
+        // O leitor de Rotinas do protocolo só aceita diretório dentro de
+        // `.cerebro/contracts`: layout apontando para fora cai no padrão.
+        boundary: join('.cerebro', 'contracts'),
+        validate: validateRoutineContract,
+        idField: 'routine_id',
+        fieldByPath: ROUTINE_FIELD_BY_PATH,
+      },
+      grant: {
+        label: 'grant',
+        layoutKey: 'accessGrants',
+        defaultDirectory: join('.cerebro', 'contracts', 'access-grants'),
+        validate: validateAccessGrant,
+        idField: 'grant_id',
+        fieldByPath: ROUTINE_FIELD_BY_PATH,
+      },
+      executor: {
+        label: 'executor',
+        layoutKey: 'executorBindings',
+        // O binding é estado privado: vive no runtime, que fica fora do Git. Ele é gerado
+        // de todo jeito para que o Console resolva o executor da rotina, e o registro em
+        // `.cerebro/compiled.json` o assume como arquivo próprio do compilador.
+        defaultDirectory: join('.cerebro', 'runtime', 'executors'),
+        boundary: join('.cerebro', 'runtime'),
+        validate: validateExecutorBinding,
+        idField: 'binding_id',
+        fieldByPath: ROUTINE_FIELD_BY_PATH,
+      },
+    },
   },
 ];
 
@@ -698,15 +1241,21 @@ export const VAULT_CONTRACT_TYPES = [
 // nota mais motivo, para que o dono corrija a nota sem abrir o JSON.
 function translate(message, fieldByPath) {
   const [path, ...rest] = String(message).split(' ');
-  const normalized = path.replace(/\[\d+\]/g, '').replace(/^(?:source|system)_contract\./, '');
+  const normalized = path.replace(/\[\d+\]/g, '')
+    .replace(/^(?:source_contract|system_contract|routine_contract|access_grant|executor_binding)\./, '');
   return problem(fieldByPath[normalized] || normalized || 'contrato', rest.join(' ') || 'inválido');
 }
 
-function insideRoot(root, configured, fallback) {
-  if (typeof configured !== 'string' || !configured || isAbsolute(configured)) return resolve(root, fallback);
+// Diretório declarado pelo layout, confinado ao Cérebro e, quando o protocolo exige, a uma
+// pasta específica dele (Rotina em `.cerebro/contracts`, binding em `.cerebro/runtime`).
+// Layout apontando para fora do limite cai no padrão, em vez de gravar onde o leitor do
+// protocolo não procura.
+function insideRoot(root, configured, fallback, boundary = '') {
   const base = resolve(root);
+  const limit = boundary ? resolve(base, boundary) : base;
+  if (typeof configured !== 'string' || !configured || isAbsolute(configured)) return resolve(base, fallback);
   const target = resolve(base, configured);
-  if (target === base || !target.startsWith(`${base}${sep}`)) return resolve(base, fallback);
+  if (target === limit || !target.startsWith(`${limit}${sep}`)) return resolve(base, fallback);
   return target;
 }
 
@@ -763,6 +1312,24 @@ function sourceIdIndex(notes) {
   return index;
 }
 
+// Sistema declarado numa nota de Rotina é wikilink para a nota System. O índice resolve o
+// alvo (slug do arquivo ou o próprio system_id) no id do contrato e na área operacional,
+// que é o escopo que o Access Grant herda.
+function systemIndexOf(notes) {
+  const index = new Map();
+  for (const note of notes) {
+    if (String(note.data.type || '').trim() !== 'System') continue;
+    const id = single(note.data.system_id);
+    if (!id || !ID_RE.test(id)) continue;
+    const areaRaw = single(note.data.area);
+    const area = areaRaw ? slug(areaRaw) : '';
+    const entry = { systemId: id, area: ID_RE.test(area) ? area : '' };
+    index.set(note.slug, entry);
+    index.set(id, entry);
+  }
+  return index;
+}
+
 // Slugs das notas de área do vault, para recusar `area:` que aponta para o nada. Vault
 // sem pasta de áreas declarada não ganha a checagem.
 function areaSlugIndex(root, config) {
@@ -795,7 +1362,12 @@ export function compileVaultContracts(root, { confirm = false, now = new Date() 
   const byType = new Map(VAULT_CONTRACT_TYPES.map((compiler) => [compiler.noteType, compiler]));
   const objectLists = [...new Set(VAULT_CONTRACT_TYPES.flatMap((compiler) => compiler.objectListFields || []))];
   const notes = typedNotes(base, config.knowledgeRoot || '.', new Set(byType.keys()), objectLists);
-  const context = { sourceIds: sourceIdIndex(notes), areaSlugs: areaSlugIndex(base, config) };
+  const context = {
+    root: base,
+    sourceIds: sourceIdIndex(notes),
+    systemIndex: systemIndexOf(notes),
+    areaSlugs: areaSlugIndex(base, config),
+  };
 
   const results = [];
   const owned = new Map();
@@ -803,64 +1375,89 @@ export function compileVaultContracts(root, { confirm = false, now = new Date() 
   const written = [];
   const removed = [];
 
+  // Caminho de cada artefato de uma nota, na pasta que o layout declara para o tipo dele.
+  function locate(compiler, artifacts) {
+    return artifacts.map((artifact) => {
+      const output = compiler.outputs[artifact.output];
+      const directory = insideRoot(base, config[output.layoutKey], output.defaultDirectory, output.boundary);
+      const id = artifact.contract[output.idField];
+      return {
+        ...artifact,
+        output,
+        id,
+        ref: posix(join(directory.slice(base.length + 1), `${id}.json`)),
+      };
+    });
+  }
+
   for (const note of notes) {
     const compiler = byType.get(String(note.data.type).trim());
-    const directory = insideRoot(base, config[compiler.layoutKey], compiler.defaultDirectory);
     if (!note.readable) {
       results.push({ path: note.path, type: compiler.noteType, status: 'error', errors: [problem('arquivo', 'nota ilegível')] });
       continue;
     }
-    const mapped = compiler.map(note.data, { ...context, previous: null, now });
-    let errors = mapped.errors;
-    let contract = mapped.contract || null;
-    let contractRef = null;
+    const first = compiler.map(note.data, { ...context, previous: null, now });
+    let errors = first.errors;
+    let located = [];
 
-    if (contract) {
-      const id = compiler.idOf(contract);
-      contractRef = posix(join(directory.slice(base.length + 1), `${id}.json`));
-      const contractPath = join(base, contractRef);
-      const previous = existsSync(contractPath) ? readRegistryContract(contractPath) : null;
+    if (!errors.length) {
+      const primary = locate(compiler, normalizeArtifacts(first))[0] || null;
+      const primaryPath = primary ? join(base, primary.ref) : null;
+      const previous = primaryPath && existsSync(primaryPath) ? readRegistryContract(primaryPath) : null;
       // Recompilar não pode mexer na observação: ela vem do `updated` da nota ou do
       // valor já gravado.
-      contract = compiler.map(note.data, { ...context, previous, now }).contract;
-      contract.extensions.vault_note_ref = note.path;
-      const duplicate = seen.get(contractRef);
-      if (duplicate) {
-        errors = [problem(compiler.idField, `id já usado por ${duplicate}`)];
-      } else {
-        seen.set(contractRef, note.path);
-        errors = compiler.validate(contract).map((message) => translate(message, compiler.fieldByPath));
+      const mapped = compiler.map(note.data, { ...context, previous, now });
+      errors = mapped.errors;
+      located = errors.length ? [] : locate(compiler, normalizeArtifacts(mapped));
+    }
+
+    for (const artifact of located) {
+      // Binding do executor é fechado pelo protocolo e não aceita extensões: só o
+      // artefato que já reserva a chave aponta de volta para a nota de origem.
+      if (artifact.contract.extensions && 'vault_note_ref' in artifact.contract.extensions) {
+        artifact.contract.extensions.vault_note_ref = note.path;
       }
+      const duplicate = seen.get(artifact.ref);
+      if (duplicate) {
+        errors.push(problem(artifact.output.idField, `id já usado por ${duplicate}`));
+        continue;
+      }
+      seen.set(artifact.ref, note.path);
+      errors.push(...artifact.output.validate(artifact.contract)
+        .map((message) => translate(message, artifact.output.fieldByPath)));
     }
 
     if (errors.length) {
       // A nota existe, então o contrato antigo dela não é órfão (ver o laço de órfãos
       // abaixo): fica como está até o dono corrigir a nota. O registro, porém, só lista
-      // arquivo que este compilador garante válido.
+      // arquivo que este compilador garante válido. Uma nota que gera vários artefatos
+      // não grava nenhum pela metade: o erro em qualquer um barra todos.
       results.push({ path: note.path, type: compiler.noteType, status: 'error', errors });
       continue;
     }
 
-    const serialized = `${JSON.stringify(contract, null, 2)}\n`;
-    const contractPath = join(base, contractRef);
-    const current = existsSync(contractPath) ? readFileSync(contractPath, 'utf8') : null;
-    const changed = current !== serialized;
-    owned.set(contractRef, { note: note.path, type: compiler.noteType, id: compiler.idOf(contract) });
-    if (confirm && changed) {
-      ensureRuntime(base);
-      writeJsonAtomic(contractPath, contract);
-      written.push(contractRef);
+    for (const artifact of located) {
+      const serialized = `${JSON.stringify(artifact.contract, null, 2)}\n`;
+      const contractPath = join(base, artifact.ref);
+      const current = existsSync(contractPath) ? readFileSync(contractPath, 'utf8') : null;
+      const changed = current !== serialized;
+      owned.set(artifact.ref, { note: note.path, type: compiler.noteType, id: artifact.id });
+      if (confirm && changed) {
+        ensureRuntime(base);
+        writeJsonAtomic(contractPath, artifact.contract);
+        written.push(artifact.ref);
+      }
+      results.push({
+        path: note.path,
+        type: compiler.noteType,
+        label: artifact.output.label,
+        status: 'ok',
+        id: artifact.id,
+        contract_ref: artifact.ref,
+        changed,
+        errors: [],
+      });
     }
-    results.push({
-      path: note.path,
-      type: compiler.noteType,
-      label: compiler.label,
-      status: 'ok',
-      id: compiler.idOf(contract),
-      contract_ref: contractRef,
-      changed,
-      errors: [],
-    });
   }
 
   const registry = readRegistry(base);
@@ -900,6 +1497,13 @@ export function compileVaultContracts(root, { confirm = false, now = new Date() 
     registry_changed: registryChanged,
     errors: results.filter((item) => item.status === 'error').length,
   };
+}
+
+// Mapeador de um artefato só devolve `contract`; o de Rotina devolve `artifacts`. O laço
+// trabalha sempre com a lista.
+function normalizeArtifacts(mapped) {
+  if (Array.isArray(mapped.artifacts)) return mapped.artifacts;
+  return mapped.contract ? [{ output: 'primary', contract: mapped.contract }] : [];
 }
 
 function readRegistryContract(path) {
