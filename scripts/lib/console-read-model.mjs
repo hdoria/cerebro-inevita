@@ -34,6 +34,7 @@ import {
 import { indexSystemRuntimeBindings } from './system-runtime-binding.mjs';
 import { experienceManifestView, indexExperienceManifests } from './experience-manifest.mjs';
 import { countInstalledSkills } from './skill-read-model.mjs';
+import { vaultAreaTitle } from './vault-today.mjs';
 import { buildCommunicationReadModel } from './communication-feed.mjs';
 
 const PRODUCT_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
@@ -605,7 +606,7 @@ export function buildConsoleReadModel(root, { now = new Date() } = {}) {
   });
   const areas = [...new Set(systems.map((system) => system.operating_area))].sort().map((operatingArea) => ({
     operating_area: operatingArea,
-    name: operatingAreaLabel(operatingArea),
+    name: vaultAreaTitle(root, layout(root).vault, operatingArea) || operatingAreaLabel(operatingArea),
     system_refs: systems.filter((system) => system.operating_area === operatingArea).map((system) => system.system_id),
     routine_refs: routines.filter((routine) => businessSystemById.get(routine.system_ref)?.operating_area === operatingArea).map((routine) => routine.routine_id),
   }));

@@ -161,6 +161,14 @@ function notes(root, dir) {
   });
 }
 
+// Título de uma área do vault (H1 da nota), para o Console não mostrar o slug.
+export function vaultAreaTitle(root, config, slug) {
+  const dir = config && inside(root, config.areas) ? config.areas : null;
+  if (!dir || !/^[a-z0-9][a-z0-9-]*$/.test(String(slug || ''))) return null;
+  const text = readText(resolve(root, dir, `${slug}.md`));
+  return text === null ? null : title(text, null);
+}
+
 export function vaultToday(root, config, { now = new Date() } = {}) {
   if (!config || typeof config !== 'object') return { available: false };
   const dirs = {};

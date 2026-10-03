@@ -210,7 +210,7 @@ try {
     vault: { daily: 'journal', inbox: 'inbox', projects: 'projects', areas: 'areas' },
   });
 
-  write(join(vaultRoot, 'areas', 'popcode.md'), '---\ntype: Area\nstatus: Active\n---\n\n# Popcode\n');
+  write(join(vaultRoot, 'areas', 'popcode.md'), '---\ntype: Area\nstatus: Active\n---\n\n# Popcode Studio\n');
   write(join(vaultRoot, 'projects', 'site.md'), '---\ntype: Project\nstatus: Active\nupdated: 2026-10-02\nbelongs_to:\n  - "[[popcode]]"\n---\n\n# Site\n');
   write(join(vaultRoot, 'sistema', 'fontes', 'gmail.md'), dataSource('gmail', 'Gmail do dono'));
   write(join(vaultRoot, 'sistema', 'fontes', 'google-calendar.md'), dataSource('google-calendar', 'Agenda do dono'));
@@ -293,6 +293,7 @@ try {
 
   const areas = api.console.areas.filter((area) => area.operating_area === 'popcode');
   assert.equal(areas.length, 1, 'a área do Sistema aparece uma única vez no modelo do Console');
+  assert.equal(areas[0].name, 'Popcode Studio', 'em modo vault o nome da área vem do H1 da nota de área, não do slug');
   assert.deepEqual(areas[0].system_refs, ['daily'], 'a área do Sistema lista a daily');
   assert.deepEqual(api.vault.areas.map((area) => area.slug), ['popcode'],
     'a área do vault continua sendo lida do vault');
@@ -315,7 +316,7 @@ try {
   const mergeAreas = new Function(`${policy}\nreturn mergedAreas;`)();
   const merged = mergeAreas(api.vault.areas, api.console.areas);
   assert.equal(merged.length, 1, 'área presente no vault e no Sistema aparece uma única vez');
-  assert.equal(merged[0].name, 'Popcode', 'o título da área do vault manda no nome do cartão');
+  assert.equal(merged[0].name, 'Popcode Studio', 'o título da área do vault manda no nome do cartão');
   assert.deepEqual(merged[0].system_refs, ['daily'], 'o cartão da área do vault passa a listar o Sistema');
   assert.equal(merged[0].origin, 'both', 'a área casada é marcada como vault mais Sistema');
   assert.equal(merged[0].active_projects, 1, 'o cartão mantém a contagem de projetos do vault');
