@@ -203,12 +203,20 @@ function stateFor(root, experimentId) {
   return state;
 }
 
-export function listExperimentContracts(root) {
-  return jsonFiles(paths(root).contracts).map((path) => {
-    const contract = readJson(path, 'Experiment Contract');
-    const errors = validateExperimentContract(contract);
-    if (errors.length) throw new Error(`Experiment Contract inválido: ${errors.join(' · ')}`);
-    return { path, contract };
+// Com coletor de issues, contrato inválido sai da lista e vira aviso: a estrita
+// continua (nunca entra como dado), mas a falha fica isolada naquele arquivo.
+export function listExperimentContracts(root, { issues = null } = {}) {
+  return jsonFiles(paths(root).contracts).flatMap((path) => {
+    try {
+      const contract = readJson(path, 'Experiment Contract');
+      const errors = validateExperimentContract(contract);
+      if (errors.length) throw new Error(`Experiment Contract inválido: ${errors.join(' · ')}`);
+      return [{ path, contract }];
+    } catch (error) {
+      if (!issues) throw error;
+      issues.push({ reason_code: 'experiment-contract-invalid', ref: relative(root, path).replaceAll('\\', '/') });
+      return [];
+    }
   });
 }
 
@@ -234,8 +242,8 @@ export function buildExperimentReadModel(root, { runRecords = null } = {}) {
   }
   const experiments = [];
   for (const { path, contract } of (() => {
-    try { return listExperimentContracts(root); }
-    catch (error) {
+    try { return listExperimentContracts(root, { issues }); }
+    catch {
       issues.push({ reason_code: 'experiment-contract-invalid', ref: '.cerebro/contracts/experiments' });
       return [];
     }

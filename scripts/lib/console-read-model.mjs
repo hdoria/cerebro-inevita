@@ -78,6 +78,18 @@ function jsonFiles(directory) {
   return readdirSync(directory).filter((name) => name.endsWith('.json')).sort().map((name) => join(directory, name));
 }
 
+// O mesmo arquivo inválido pode ser lido por mais de uma leitura (recibo por rotina e
+// na caixa de julgamentos); em Saúde ele aparece uma vez só.
+function uniqueIssues(issues) {
+  const seen = new Set();
+  return issues.filter((issue) => {
+    const key = `${issue.reason_code}\u0000${issue.ref}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 const ACTIVATION_STEPS = [
   { milestone: 'T0', id: 'work', name: 'Escolha um trabalho real', description: 'Comece pelo que precisa sair pronto agora; não pelo mapa inteiro da empresa.' },
   { milestone: 'T1', id: 'source', name: 'Traga uma fonte-semente', description: 'Pode ser texto, fala, arquivo ou uma Fonte já conectada e autorizada.' },
@@ -86,7 +98,7 @@ const ACTIVATION_STEPS = [
   { milestone: 'T4', id: 'reuse', name: 'Reutilize sem reexplicar', description: 'Uma segunda tarefa prova que o contexto aprovado voltou a trabalhar.' },
 ];
 
-export function activationState(root, { issues = [] } = {}) {
+export function activationState(root, { issues = [], vaultDeclared = false } = {}) {
   const directory = join(root, '.cerebro', 'concierge-runs');
   const runs = jsonFiles(directory).flatMap((path) => {
     try {
@@ -108,17 +120,20 @@ export function activationState(root, { issues = [] } = {}) {
   const milestones = Object.fromEntries(ACTIVATION_STEPS.map((step) => [step.milestone, activeRun?.milestones?.[step.milestone] || null]));
   const steps = ACTIVATION_STEPS.map((step) => ({ ...step, completed_at: milestones[step.milestone] }));
   const completedSteps = steps.filter((step) => step.completed_at).length;
-  const complete = Boolean(milestones.T4);
+  // Vault declarado no layout já é um Cérebro em uso: conta como ativado sem
+  // inventar recibo de primeira missão.
+  const complete = Boolean(milestones.T4) || vaultDeclared;
   const currentStep = complete ? null : steps.find((step) => !step.completed_at) || steps.at(-1);
   return {
     status: complete ? 'complete' : activeRun ? 'in-progress' : 'not-started',
     complete,
+    reason_code: milestones.T4 || !vaultDeclared ? null : 'vault-declared',
     command: '/comecar',
     run_id: activeRun?.runId || null,
     system_id: activeRun?.systemId || 'cerebro-base',
     product_version: activeRun?.productVersion || null,
     run_ref: activeRun?.run_ref || null,
-    receipt_ref: complete ? activeRun.run_ref : null,
+    receipt_ref: complete ? activeRun?.run_ref || null : null,
     started_at: milestones.T0,
     completed_at: milestones.T4,
     completed_steps: completedSteps,
@@ -414,12 +429,12 @@ function healthReason(contract, state, binding, preparation, migration, receipts
     : 'ready-manual-run';
 }
 
-function routineView(root, contract, now, runRecordsById) {
+function routineView(root, contract, now, runRecordsById, issues) {
   const state = loadRoutineState(root, contract.routine_id).state;
   const binding = bindingView(root, contract);
   const preparation = preparationView(root, contract);
   const migration = loadRoutineMigration(root, contract.routine_id, { optional: true }).migration;
-  const receipts = listRoutineRunReceipts(root, contract.routine_id)
+  const receipts = listRoutineRunReceipts(root, contract.routine_id, { issues })
     .sort((left, right) => Date.parse(right.completed_at) - Date.parse(left.completed_at));
   const latestManual = receipts.find((receipt) => receipt.trigger === 'manual' && receipt.status === 'completed') || null;
   const blocker = routineMigrationBlocker(root, contract.routine_id);
@@ -481,7 +496,7 @@ function routineView(root, contract, now, runRecordsById) {
 
 function judgmentInbox(root, routines, issues, runRecordsById) {
   const names = new Map(routines.map((routine) => [routine.routine_id, routine.name]));
-  return listRoutineRunReceipts(root)
+  return listRoutineRunReceipts(root, null, { issues })
     .filter((receipt) => receipt.status === 'completed' && receipt.output_ref)
     .map((receipt) => {
       const runRecord = runRecordsById.get(receipt.run_id) || null;
@@ -543,7 +558,12 @@ export function buildConsoleReadModel(root, { now = new Date() } = {}) {
   const allSystems = listSystemContracts(root, issues);
   const systems = allSystems.filter((system) => system.product_kind === 'business-system' && system.surface === 'systems');
   const nativeSystems = allSystems.filter((system) => system.product_kind === 'brain-native' || system.surface === 'brain');
-  const activation = activationState(root, { issues });
+  let vaultDeclared = false;
+  try {
+    const vault = layout(root).vault;
+    vaultDeclared = Boolean(vault) && typeof vault === 'object';
+  } catch { vaultDeclared = false; }
+  const activation = activationState(root, { issues, vaultDeclared });
   const communication = buildCommunicationReadModel(PRODUCT_ROOT);
   let runRecords = [];
   try {
@@ -556,8 +576,14 @@ export function buildConsoleReadModel(root, { now = new Date() } = {}) {
   issues.push(...experimentModel.issues);
   let routines = [];
   try {
-    routines = listRoutineContracts(root)
-      .map((contract) => routineView(root, contract, observedAt, runRecordsById));
+    routines = listRoutineContracts(root, { issues }).flatMap((contract) => {
+      try {
+        return [routineView(root, contract, observedAt, runRecordsById, issues)];
+      } catch {
+        issues.push({ reason_code: 'routine-state-invalid', ref: `routine:${contract.routine_id}` });
+        return [];
+      }
+    });
   } catch {
     issues.push({ reason_code: 'routine-contract-invalid', ref: '.cerebro/contracts/routines' });
   }
@@ -650,7 +676,7 @@ export function buildConsoleReadModel(root, { now = new Date() } = {}) {
       active: routines.filter((routine) => routine.health_reason_code === 'active').map((routine) => routine.routine_id),
       pending_judgments: pendingJudgments.map((item) => item.receipt_id),
     },
-    issues,
+    issues: uniqueIssues(issues),
   };
 }
 

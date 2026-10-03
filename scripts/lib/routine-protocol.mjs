@@ -498,6 +498,19 @@ export function validateRoutineMigration(value) {
   return [...new Set(errors)];
 }
 
+function brainRef(root, path) {
+  return relative(root, path).replaceAll('\\', '/');
+}
+
+// Com um coletor de issues, arquivo inválido sai da lista e vira aviso: a estrita
+// continua (nunca entra como dado), mas a falha fica isolada naquele arquivo.
+// Sem coletor, o erro sobe como antes.
+function collectInvalid(issues, reasonCode, root, path, error) {
+  if (!issues) throw error;
+  issues.push({ reason_code: reasonCode, ref: brainRef(root, path) });
+  return [];
+}
+
 function safeDirectory(root, configured, fallback, privateBase) {
   const brainRoot = resolve(root);
   const target = resolve(root, configured || fallback);
@@ -588,15 +601,20 @@ export function loadRoutineContract(root, routineId) {
   return { contract, path, ref: `routine:${contract.routine_id}:${contract.version}` };
 }
 
-export function listRoutineContracts(root) {
+export function listRoutineContracts(root, { issues = null } = {}) {
   const directory = safeDirectory(root, layout(root).routineContracts,
     join('.cerebro', 'contracts', 'routines'), join('.cerebro', 'contracts'));
   if (!existsSync(directory)) return [];
-  return readdirSync(directory).filter((name) => name.endsWith('.json')).sort().map((name) => {
-    const value = readJson(join(directory, name), `Routine Contract ${name}`);
-    const errors = validateRoutineContract(value);
-    if (errors.length) throw new Error(`Routine Contract ${name} inválido: ${errors.join(' · ')}`);
-    return value;
+  return readdirSync(directory).filter((name) => name.endsWith('.json')).sort().flatMap((name) => {
+    const path = join(directory, name);
+    try {
+      const value = readJson(path, `Routine Contract ${name}`);
+      const errors = validateRoutineContract(value);
+      if (errors.length) throw new Error(`Routine Contract ${name} inválido: ${errors.join(' · ')}`);
+      return [value];
+    } catch (error) {
+      return collectInvalid(issues, 'routine-contract-invalid', root, path, error);
+    }
   });
 }
 
@@ -729,14 +747,19 @@ export function readRoutineRunReceipt(root, receiptRef) {
   return value;
 }
 
-export function listRoutineRunReceipts(root, routineId = null) {
+export function listRoutineRunReceipts(root, routineId = null, { issues = null } = {}) {
   const directory = routineReceiptDirectory(root);
   if (!existsSync(directory)) return [];
-  return readdirSync(directory).filter((name) => name.endsWith('.json')).sort().map((name) => {
-    const value = readJson(join(directory, name), `Routine Run Receipt ${name}`);
-    const errors = validateRoutineRunReceipt(value);
-    if (errors.length) throw new Error(`Routine Run Receipt ${name} inválido: ${errors.join(' · ')}`);
-    return value;
+  return readdirSync(directory).filter((name) => name.endsWith('.json')).sort().flatMap((name) => {
+    const path = join(directory, name);
+    try {
+      const value = readJson(path, `Routine Run Receipt ${name}`);
+      const errors = validateRoutineRunReceipt(value);
+      if (errors.length) throw new Error(`Routine Run Receipt ${name} inválido: ${errors.join(' · ')}`);
+      return [value];
+    } catch (error) {
+      return collectInvalid(issues, 'routine-receipt-invalid', root, path, error);
+    }
   }).filter((value) => routineId === null || value.routine_id === routineId);
 }
 
