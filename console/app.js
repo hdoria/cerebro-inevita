@@ -42,6 +42,9 @@ const state = {
   skills: { origin: 'company', status: 'all', link: 'all', query: '', data: null, loading: false, error: null },
   society: { filter: 'all', query: '', data: null, loading: false, error: null, selected: null },
   cases: { list: null, detail: null, form: null, preview: null, actor: '' },
+  // Revelar título de nota privada é estado só do cliente: nasce desligado em cada
+  // carregamento e nunca é guardado, para a tela poder ser mostrada sem expor nomes.
+  knowledge: { reveal: false },
   canvas: {
     scope: 'brain', ref: null, editable: false, controller: null, graph: null, positions: null,
   },
@@ -1183,7 +1186,9 @@ function renderBrainMemory(anatomy) {
   const memory = anatomy.control_center.memory;
   return `<div class="brain-control-view brain-memory-view">
     <section class="brain-lifecycle">
-      <header><div><p class="micro">Estados da memória</p><h2>O que é medido — e o que ainda não é.</h2><p>Contagem de pasta não substitui recibo de captura, processamento ou destilação.</p></div></header>
+      <header><div><p class="micro">Estados da memória</p>${memory.measured_by_vault
+    ? '<h2>Do bruto ao contexto vigente, medido pelo vault.</h2><p>Cada estado conta notas reais: inbox, frontmatter organizado, fontes destiladas e o que foi atualizado nos últimos 90 dias.</p>'
+    : '<h2>O que é medido — e o que ainda não é.</h2><p>Contagem de pasta não substitui recibo de captura, processamento ou destilação.</p>'}</div></header>
       <ol>${memory.lifecycle.map((step) => `<li class="${step.measured ? 'is-measured' : 'is-unmeasured'}"><span>${escapeHtml(step.name)}</span><strong>${step.measured ? brainCount(step.value) : 'Não instrumentado'}</strong><small>${step.measured ? escapeHtml(step.unit || 'objetos observados') : 'a transição ainda não emite recibo canônico'}</small></li>`).join('')}</ol>
       <div class="brain-freshness-note"><b>Frescor por Fonte · não calculado</b><span>${brainCount(memory.freshness.declared_policies)} políticas declaradas em texto; falta uma regra machine-readable para comparar vigência.</span></div>
     </section>
@@ -3100,16 +3105,32 @@ function startParticles() {
 
 // DIRECTORY do conhecimento — como o cérebro está distribuído e o que é mais
 // linkado. Índice derivado do fosso (01-nucleo-privado), calculado pelo server.
+// Nota privada chega sem título e sem caminho: o rótulo é neutro e só o domínio
+// (a pasta) dá contexto. Com o título escondido não há o que copiar, então a linha
+// deixa de ser botão.
+function knowledgeNoteRow(note) {
+  if (note.private && !note.title) {
+    return `<span class="knowledge-note is-private"><strong>Nota privada</strong><small>${escapeHtml(note.domain)} · ${note.count}←</small></span>`;
+  }
+  return `<button type="button" class="knowledge-note${note.private ? ' is-private' : ''}" data-copy-ref="${escapeHtml(note.path)}" title="Copiar caminho"><strong>${escapeHtml(note.title)}</strong><small>${escapeHtml(note.domain)} · ${note.count}←</small></button>`;
+}
+
 async function renderKnowledgePanel() {
   try {
-    const knowledge = await getJson('/api/knowledge');
+    const knowledge = await getJson(`/api/knowledge${state.knowledge.reveal ? '?reveal=1' : ''}`);
     const inspector = $('#canvas-inspector');
     if (!inspector || state.view !== 'canvas' || state.canvas.scope !== 'brain') return;
     const maxDomain = Math.max(1, ...knowledge.domains.map((domain) => domain.count));
+    // Largura da barra em degraus de 5% via classe: a CSP do Console proíbe style inline.
+    const bar = (count) => `w-${String(Math.max(1, Math.round((count / maxDomain) * 20)) * 5).padStart(3, '0')}`;
+    const privateNotes = knowledge.most_linked.filter((note) => note.private).length;
+    const toggle = privateNotes
+      ? `<button type="button" class="knowledge-reveal" data-knowledge-reveal="${state.knowledge.reveal ? '0' : '1'}">${state.knowledge.reveal ? 'Esconder' : 'Revelar'} ${privateNotes} título(s) privado(s)</button>`
+      : '';
     inspector.innerHTML = `<p class="micro">Memória semântica · Diagnóstico</p><h3>Notas e conexões</h3>
-      <div class="canvas-inspector-state"><span>${knowledge.total_notes} notas · 01-nucleo-privado</span></div>
-      <div class="knowledge-block"><p class="micro">Domínios</p>${knowledge.domains.map((domain) => `<div class="knowledge-domain"><span>${escapeHtml(domain.name)}</span><i style="--w:${Math.round((domain.count / maxDomain) * 100)}%"></i><b>${domain.count}</b></div>`).join('')}</div>
-      <div class="knowledge-block"><p class="micro">Mais linkadas</p>${knowledge.most_linked.map((note) => `<button type="button" class="knowledge-note" data-copy-ref="${escapeHtml(note.path)}" title="Copiar caminho"><strong>${escapeHtml(note.title)}</strong><small>${escapeHtml(note.domain)} · ${note.count}←</small></button>`).join('') || '<p class="muted">Nenhum wikilink encontrado.</p>'}</div>
+      <div class="canvas-inspector-state"><span>${knowledge.total_notes} notas · raiz de conhecimento</span></div>
+      <div class="knowledge-block"><p class="micro">Domínios</p>${knowledge.domains.map((domain) => `<div class="knowledge-domain"><span>${escapeHtml(domain.name)}</span><i class="${bar(domain.count)}"></i><b>${domain.count}</b></div>`).join('')}</div>
+      <div class="knowledge-block"><p class="micro">Mais linkadas</p>${knowledge.most_linked.map(knowledgeNoteRow).join('') || '<p class="muted">Nenhum wikilink encontrado.</p>'}${toggle}</div>
       <p class="section-help">Diagnóstico secundário da memória — o cérebro começa pelos resultados que sabe produzir, não pela contagem de notas.</p>`;
   } catch { /* painel opcional — o Canvas funciona sem ele */ }
 }
@@ -3887,6 +3908,12 @@ document.addEventListener('click', (event) => {
       () => toast('Comando do diagnóstico copiado.'),
       () => toast('Não foi possível copiar o comando.', 'bad'),
     );
+    return;
+  }
+  const knowledgeReveal = event.target.closest('[data-knowledge-reveal]');
+  if (knowledgeReveal) {
+    state.knowledge.reveal = knowledgeReveal.dataset.knowledgeReveal === '1';
+    void renderKnowledgePanel();
     return;
   }
   if (event.target.closest('[data-update-check]')) { void checkBrainUpdates(); return; }

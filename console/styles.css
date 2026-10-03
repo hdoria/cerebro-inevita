@@ -1972,6 +1972,14 @@ button.brain-run-row:hover { background: color-mix(in srgb, var(--text) 1.8%, tr
 }
 .knowledge-domain span { overflow: hidden; color: var(--text-2); font: 500 var(--fs-micro) var(--font-mono); text-overflow: ellipsis; white-space: nowrap; }
 .knowledge-domain i { display: block; height: 6px; width: var(--w, 10%); border-radius: var(--r-sm); background: color-mix(in srgb, var(--text) 75%, transparent); }
+/* Degraus de 5% para a barra do domínio — a CSP do Console proíbe style inline. */
+.knowledge-domain i.w-005 { --w: 5%; } .knowledge-domain i.w-010 { --w: 10%; } .knowledge-domain i.w-015 { --w: 15%; }
+.knowledge-domain i.w-020 { --w: 20%; } .knowledge-domain i.w-025 { --w: 25%; } .knowledge-domain i.w-030 { --w: 30%; }
+.knowledge-domain i.w-035 { --w: 35%; } .knowledge-domain i.w-040 { --w: 40%; } .knowledge-domain i.w-045 { --w: 45%; }
+.knowledge-domain i.w-050 { --w: 50%; } .knowledge-domain i.w-055 { --w: 55%; } .knowledge-domain i.w-060 { --w: 60%; }
+.knowledge-domain i.w-065 { --w: 65%; } .knowledge-domain i.w-070 { --w: 70%; } .knowledge-domain i.w-075 { --w: 75%; }
+.knowledge-domain i.w-080 { --w: 80%; } .knowledge-domain i.w-085 { --w: 85%; } .knowledge-domain i.w-090 { --w: 90%; }
+.knowledge-domain i.w-095 { --w: 95%; } .knowledge-domain i.w-100 { --w: 100%; }
 .knowledge-domain b { color: var(--text-3); font: 560 var(--fs-micro) var(--font-mono); font-variant-numeric: tabular-nums; }
 .knowledge-note {
   display: grid;
@@ -1991,6 +1999,23 @@ button.brain-run-row:hover { background: color-mix(in srgb, var(--text) 1.8%, tr
 .knowledge-note:hover { color: var(--text); border-color: var(--hairline); background: color-mix(in srgb, var(--text) 4%, transparent); }
 .knowledge-note strong { overflow: hidden; font: 560 var(--fs-micro) var(--font-mono); text-overflow: ellipsis; white-space: nowrap; }
 .knowledge-note small { color: var(--text-3); font: 480 10px var(--font-mono); white-space: nowrap; }
+/* Nota privada: rótulo neutro, sem título e sem caminho para copiar. */
+span.knowledge-note { cursor: default; }
+.knowledge-note.is-private strong { color: var(--text-3); font-style: italic; }
+.knowledge-reveal {
+  display: block;
+  width: 100%;
+  padding: 5px 7px;
+  margin-top: var(--s2);
+  color: var(--text-3);
+  border: 1px dashed var(--hairline);
+  border-radius: var(--r-sm);
+  background: transparent;
+  font: 500 10px var(--font-mono);
+  text-align: left;
+  cursor: pointer;
+}
+.knowledge-reveal:hover { color: var(--text); border-style: solid; background: color-mix(in srgb, var(--text) 4%, transparent); }
 
 /* Enxame de partículas — o núcleo vivo do cérebro */
 .canvas-particles { position: absolute; inset: 0; z-index: 1; pointer-events: none; }

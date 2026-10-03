@@ -20,6 +20,7 @@ import { buildSkillReadModel } from './lib/skill-read-model.mjs';
 import { buildSocietyCatalogReadModel } from './lib/society-catalog-read-model.mjs';
 import { latestRunRecords, layout } from './lib/system-protocol.mjs';
 import { vaultToday } from './lib/vault-today.mjs';
+import { isPrivateNote, knowledgeNotes, vaultMemoryLifecycle } from './lib/vault-read-model.mjs';
 import { saveCanvasLayout } from './lib/canvas-layout-runtime.mjs';
 import {
   buildBrainGraph,
@@ -83,35 +84,31 @@ function consolePaths(root) {
   };
 }
 
+// Configuração do vault declarada no layout. Presente = modo vault; ausente = a
+// instalação da INEVITA, que não muda de comportamento por causa deste módulo.
+function vaultConfig(root) {
+  let configured = {};
+  try { configured = layout(root); } catch { configured = {}; }
+  const value = configured.vault;
+  return value && typeof value === 'object' && !Array.isArray(value) ? value : null;
+}
+
 // Índice derivado do conhecimento: varre SOMENTE a raiz de conhecimento (por padrão
 // 01-nucleo-privado), nunca 02-dados-terceiros. Reconstruível a cada chamada; não cria verdade.
-export function knowledgeIndex(root) {
+// Em modo vault, nota com `visibility: private` entra na lista sem título e sem caminho
+// (o caminho revelaria o título); `reveal` manda os dois, e é sempre um pedido explícito.
+export function knowledgeIndex(root, { reveal = false } = {}) {
   const knowledgeRoot = consolePaths(root).knowledgeRoot;
-  const base = resolve(root, knowledgeRoot);
-  const files = [];
-  const walk = (dir) => {
-    let entries;
-    try { entries = readdirSync(dir, { withFileTypes: true }); } catch { return; }
-    for (const entry of entries) {
-      if (entry.name.startsWith('.') || entry.name === 'node_modules') continue;
-      const full = resolve(dir, entry.name);
-      if (entry.isDirectory()) walk(full);
-      else if (entry.isFile() && entry.name.endsWith('.md')) files.push(full);
-    }
-  };
-  walk(base);
+  const notes = knowledgeNotes(root, knowledgeRoot);
+  const vaultMode = Boolean(vaultConfig(root));
   const domains = new Map();
   const inbound = new Map();
   const slugs = new Map();
-  for (const file of files) {
-    const relative = file.slice(base.length + 1);
-    const domain = relative.includes('/') ? relative.slice(0, relative.indexOf('/')) : '·raiz';
-    domains.set(domain, (domains.get(domain) || 0) + 1);
-    const slug = relative.slice(relative.lastIndexOf('/') + 1, -3);
-    slugs.set(slug, { relative, domain });
-    let content = '';
-    try { content = readFileSync(file, 'utf8'); } catch { continue; }
-    for (const match of content.matchAll(/\[\[([^\]|#\n]+)/g)) {
+  for (const note of notes) {
+    domains.set(note.domain, (domains.get(note.domain) || 0) + 1);
+    slugs.set(note.slug, { relative: note.relative, domain: note.domain, private: vaultMode && isPrivateNote(note) });
+    if (!note.readable) continue;
+    for (const match of note.content.matchAll(/\[\[([^\]|#\n]+)/g)) {
       const target = match[1].trim();
       if (target) inbound.set(target, (inbound.get(target) || 0) + 1);
     }
@@ -120,10 +117,20 @@ export function knowledgeIndex(root) {
     .filter(([slug]) => slugs.has(slug))
     .sort((left, right) => right[1] - left[1])
     .slice(0, 12)
-    .map(([slug, count]) => ({ title: slug, count, domain: slugs.get(slug).domain, path: join(knowledgeRoot, slugs.get(slug).relative) }));
+    .map(([slug, count]) => {
+      const note = slugs.get(slug);
+      const open = !note.private || reveal;
+      const entry = {
+        title: open ? slug : null,
+        count,
+        domain: note.domain,
+        path: open ? join(knowledgeRoot, note.relative) : null,
+      };
+      return vaultMode ? { ...entry, private: note.private } : entry;
+    });
   const domainList = [...domains.entries()].sort((left, right) => right[1] - left[1]).slice(0, 10)
     .map(([name, count]) => ({ name, count }));
-  return { total_notes: files.length, domains: domainList, most_linked: top };
+  return { total_notes: notes.length, domains: domainList, most_linked: top };
 }
 
 // Fila única de decisão do cérebro — leitura fiel do objeto que o motor do
@@ -498,8 +505,10 @@ export function nativeCapabilitiesModel({
   });
 }
 
-export function brainControlCenterModel(root, { sources = [], retrievalHealth = null, systems = [] } = {}) {
+export function brainControlCenterModel(root, { sources = [], retrievalHealth = null, systems = [], now = new Date() } = {}) {
   const health = retrievalHealth || retrievalHealthModel(root);
+  // Em modo vault os estados da memória saem das notas; sem vault seguem não instrumentados.
+  const vaultMemory = vaultMemoryLifecycle(root, vaultConfig(root), { knowledgeRoot: consolePaths(root).knowledgeRoot, now });
   const records = healthRunRecords(root);
   const systemContracts = listJsonDir(root, '.cerebro/contracts/systems');
   const sourceContracts = listJsonDir(root, '.cerebro/contracts/sources');
@@ -628,11 +637,14 @@ export function brainControlCenterModel(root, { sources = [], retrievalHealth = 
     memory: {
       lifecycle: [
         { id: 'source', name: 'Fonte', measured: true, value: observedSources, total: totalSources, unit: 'Fontes observadas' },
-        { id: 'raw', name: 'Bruto', measured: false, value: null, reason_code: 'capture-transition-receipt-missing' },
-        { id: 'processed', name: 'Processado', measured: false, value: null, reason_code: 'processing-transition-receipt-missing' },
-        { id: 'distilled', name: 'Destilado', measured: false, value: null, reason_code: 'distillation-transition-receipt-missing' },
-        { id: 'current-context', name: 'Contexto vigente', measured: Number.isFinite(health.index.documents), value: health.index.documents, unit: 'documentos no corpus explícito do piloto', reason_code: Number.isFinite(health.index.documents) ? null : 'index-receipt-missing' },
+        ...(vaultMemory.available ? vaultMemory.steps : [
+          { id: 'raw', name: 'Bruto', measured: false, value: null, reason_code: 'capture-transition-receipt-missing' },
+          { id: 'processed', name: 'Processado', measured: false, value: null, reason_code: 'processing-transition-receipt-missing' },
+          { id: 'distilled', name: 'Destilado', measured: false, value: null, reason_code: 'distillation-transition-receipt-missing' },
+          { id: 'current-context', name: 'Contexto vigente', measured: Number.isFinite(health.index.documents), value: health.index.documents, unit: 'documentos no corpus explícito do piloto', reason_code: Number.isFinite(health.index.documents) ? null : 'index-receipt-missing' },
+        ]),
       ],
+      measured_by_vault: vaultMemory.available,
       freshness: {
         measured: false,
         declared_policies: freshPolicies,
@@ -1511,9 +1523,7 @@ export function createConsoleServer({
       }
       if (request.method === 'GET' && url.pathname === '/api/vault-today') {
         if (!exactEqual(cookies(request)[COOKIE_NAME], sessionToken)) throw new Error('session-required');
-        let configured = {};
-        try { configured = layout(brainRoot); } catch { configured = {}; }
-        send(response, 200, vaultToday(brainRoot, configured.vault));
+        send(response, 200, vaultToday(brainRoot, vaultConfig(brainRoot)));
         return;
       }
       if (request.method === 'GET' && url.pathname === '/api/decisions') {
@@ -1576,7 +1586,7 @@ export function createConsoleServer({
       }
       if (request.method === 'GET' && url.pathname === '/api/knowledge') {
         if (!exactEqual(cookies(request)[COOKIE_NAME], sessionToken)) throw new Error('session-required');
-        send(response, 200, knowledgeIndex(brainRoot));
+        send(response, 200, knowledgeIndex(brainRoot, { reveal: url.searchParams.get('reveal') === '1' }));
         return;
       }
       if (request.method === 'GET' && url.pathname === '/api/session') {
