@@ -1152,6 +1152,28 @@ button.brain-run-row:hover { background: color-mix(in srgb, var(--text) 1.8%, tr
 .brain-reconciliation h2 { margin: 0; color: var(--text); font-size: var(--fs-lead); font-weight: 580; }
 .brain-reconciliation > p { margin: 0; color: var(--text-3); font-size: var(--fs-meta); }
 
+/* Julgamentos em Aprendizado: veredicto contado e os últimos martelos */
+.brain-judgment-log { padding: var(--s5) 0; border-bottom: 1px solid var(--hairline); }
+.brain-judgment-log > header { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--s5); padding-bottom: var(--s3); border-bottom: 1px solid var(--hairline-2); }
+.brain-judgment-log h2 { margin: 0; color: var(--text); font-size: 19px; font-weight: 580; letter-spacing: -.02em; }
+.brain-judgment-log > header p:not(.micro) { max-width: 620px; margin: var(--s2) 0 0; color: var(--text-3); font-size: var(--fs-meta); line-height: 1.5; }
+.brain-judgment-log > header > span { color: var(--text-3); font: 540 var(--fs-micro) var(--font-mono); white-space: nowrap; }
+.brain-verdict-counts { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0; margin: var(--s4) 0 0; padding: 0; list-style: none; }
+.brain-verdict { padding-left: var(--s4); border-left: 2px solid var(--hairline); }
+.brain-verdict.is-approved { border-left-color: var(--ok); }
+.brain-verdict.is-changes-requested { border-left-color: var(--wait); }
+.brain-verdict.is-rejected { border-left-color: var(--fail); }
+.brain-verdict.is-pending { border-left-color: var(--idle); }
+.brain-verdict b { display: block; color: var(--text); font: 630 24px var(--font-sans); font-variant-numeric: tabular-nums; }
+.brain-verdict small { display: block; margin-top: 1px; color: var(--text-3); font: 540 var(--fs-micro) var(--font-mono); }
+.brain-judgment-entries { margin: var(--s4) 0 0; padding: 0; list-style: none; }
+.brain-judgment-entry { display: grid; grid-template-columns: 96px minmax(0, 1fr) auto; align-items: start; gap: var(--s4); padding: var(--s3) 0; border-bottom: 1px solid var(--hairline); }
+.brain-judgment-date { color: var(--text-3); font: 540 var(--fs-micro) var(--font-mono); white-space: nowrap; }
+.brain-judgment-entry strong { display: block; color: var(--text); font-size: var(--fs-body); font-weight: 560; }
+.brain-judgment-entry > div > span { display: block; color: var(--text-3); font: 540 var(--fs-micro) var(--font-mono); }
+.brain-judgment-entry p { margin: var(--s2) 0 0; color: var(--text-2); font-size: var(--fs-meta); line-height: 1.5; }
+.brain-judgment-entry p.brain-judgment-silent { color: var(--text-3); }
+
 .brain-architecture-lead { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(360px, .85fr); gap: var(--s7); padding: var(--s6) 0; border-top: 1px solid var(--hairline-2); border-bottom: 1px solid var(--hairline); }
 .brain-architecture-lead dl { align-self: end; margin: 0; }
 .brain-architecture-lead dl > div { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: var(--s4); padding: var(--s2) 0; border-top: 1px solid var(--hairline); }
@@ -1282,6 +1304,10 @@ button.brain-run-row:hover { background: color-mix(in srgb, var(--text) 1.8%, tr
   .brain-learning-status, .brain-reconciliation { align-items: flex-start; flex-direction: column; }
   .brain-learning-status > span { white-space: normal; }
   .brain-learning-ledger li { grid-template-columns: 1fr; gap: var(--s2); }
+  .brain-judgment-log > header { align-items: flex-start; flex-direction: column; }
+  .brain-judgment-log > header > span { white-space: normal; }
+  .brain-verdict-counts { grid-template-columns: 1fr 1fr; gap: var(--s3) 0; }
+  .brain-judgment-entry { grid-template-columns: 1fr; gap: var(--s2); }
   .brain-architecture-contracts > dl { grid-template-columns: 1fr 1fr; }
   .brain-architecture-contracts > dl > div:nth-child(odd) { border-left: 0; }
   .brain-run-contract dl, .brain-run-observed dl { grid-template-columns: 1fr; }

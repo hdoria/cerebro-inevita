@@ -1354,6 +1354,42 @@ function renderVaultLearning(insights) {
   </div>`;
 }
 
+/* Julgamentos em Aprendizado (ticket 12): a contagem por veredicto, quantas execuções
+   ainda esperam martelo e os últimos julgamentos com data, execução e nota curta. Vale
+   também para o histórico importado do vault, onde a execução é um recibo de Rotina.
+   Classe, nunca estilo inline: a CSP do Console bloqueia style=. */
+const JUDGMENT_VERDICT_TONE = { approved: 'good', 'changes-requested': 'warn', rejected: 'bad' };
+
+function brainJudgmentEntry(entry) {
+  const origin = entry.system_ref || entry.routine_id || entry.run_id || 'execução não observada';
+  return `<li class="brain-judgment-entry">
+    <span class="brain-judgment-date">${fmtDate(entry.decided_at, false)}</span>
+    <div>
+      <strong>${escapeHtml(origin)}</strong>
+      <span>${escapeHtml(entry.routine_id || entry.run_id || '')}</span>
+      ${entry.note ? `<p>${escapeHtml(entry.note)}</p>` : '<p class="brain-judgment-silent">Aprovado sem nota.</p>'}
+    </div>
+    ${badge(entry.verdict || 'decided', JUDGMENT_VERDICT_TONE[entry.verdict] || 'neutral')}
+  </li>`;
+}
+
+function brainJudgmentLog(learning) {
+  const counts = learning.by_verdict || {};
+  const tiles = [
+    ['approved', 'aprovados'],
+    ['changes-requested', 'pedidos de mudança'],
+    ['rejected', 'rejeitados'],
+  ].map(([verdict, name]) => `<li class="brain-verdict is-${verdict}"><b>${brainCount(counts[verdict] || 0)}</b><small>${name}</small></li>`).join('');
+  const latest = learning.latest || [];
+  return `<section class="brain-judgment-log">
+    <header><div><p class="micro">Martelo humano</p><h2>Julgamentos registrados</h2><p>Cada julgamento é um recibo no runtime, ligado à execução que ele decidiu. A nota fica local e nunca entra na nota do vault.</p></div><span>${brainCount(learning.judgments)} julgamento(s) · ${brainCount(learning.pending ?? 0)} pendente(s)</span></header>
+    <ul class="brain-verdict-counts">${tiles}<li class="brain-verdict is-pending"><b>${brainCount(learning.pending ?? 0)}</b><small>esperando martelo</small></li></ul>
+    ${latest.length
+    ? `<ol class="brain-judgment-entries">${latest.map(brainJudgmentEntry).join('')}</ol>`
+    : '<p class="brain-clear-state">Nenhuma execução julgada ainda. Abrir uma execução em Julgamento registra o primeiro martelo.</p>'}
+  </section>`;
+}
+
 function renderBrainLearning(anatomy) {
   const learning = anatomy.control_center.learning;
   const runs = anatomy.control_center.recovery.runs.filter((run) => run.judgments || run.outcomes || run.correction_linked);
@@ -1364,6 +1400,8 @@ function renderBrainLearning(anatomy) {
       <div><p class="micro">Ciclo de aprendizado</p><h2>${learning.candidates ? `${brainCount(learning.candidates)} melhorias aguardam prova.` : 'Ainda não existe melhoria pronta para promoção.'}</h2><p>Julgamento registra confiança. Outcome prova efeito. Só então uma mudança pode voltar ao Sistema.</p></div>
       <ol><li><span>01</span><b>${brainCount(learning.judgments)}</b><small>julgamentos</small></li><li><span>02</span><b>${brainCount(learning.corrections)}</b><small>correções</small></li><li><span>03</span><b>${brainCount(learning.outcomes)}</b><small>Runs com outcome</small></li><li><span>04</span><b>${brainCount(learning.candidates)}</b><small>candidatos</small></li></ol>
     </section>
+
+    ${brainJudgmentLog(learning)}
 
     <section class="brain-learning-status ${learning.candidates ? '' : 'is-empty'}">
       <div><p class="micro">Candidatos</p><h2>${learning.candidates ? 'Fila materializada' : 'Nenhum candidato materializado'}</h2><p>${learning.candidates ? 'A promoção continua dependente de prova e martelo humano.' : 'Isso não significa que o Cérebro não aprendeu nada; significa que nenhum Learning Candidate Receipt foi emitido.'}</p></div>

@@ -507,6 +507,64 @@ export function nativeCapabilitiesModel({
   });
 }
 
+// Os três veredictos do Judgment Receipt. A ordem é a da decisão humana: aprovar,
+// pedir mudança, rejeitar.
+const JUDGMENT_VERDICTS = ['approved', 'changes-requested', 'rejected'];
+// Quantos julgamentos a tela mostra em "últimos julgamentos".
+const LATEST_JUDGMENTS = 8;
+// A nota do julgamento é privada e pode ser longa; na lista só cabe o começo dela.
+const JUDGMENT_NOTE_PREVIEW = 180;
+
+function routineReceiptsForLearning(root) {
+  try {
+    return listRoutineRunReceipts(root);
+  } catch {
+    // Um recibo ilegível não pode apagar o aprendizado das outras execuções.
+    return [];
+  }
+}
+
+function notePreview(value) {
+  const note = String(value || '').replace(/\s+/g, ' ').trim();
+  if (!note) return '';
+  return note.length > JUDGMENT_NOTE_PREVIEW ? `${note.slice(0, JUDGMENT_NOTE_PREVIEW - 1)}…` : note;
+}
+
+// Aprendizado por julgamento: contagem por veredicto, os últimos julgamentos com a
+// execução que cada um decidiu e quantas execuções ainda esperam martelo. Tudo sai do
+// runtime — recibo de julgamento × recibo de execução de Rotina — e nunca da nota.
+function judgmentLearning(root, judgments, routineReceipts) {
+  const receiptsById = new Map(routineReceipts.map((receipt) => [receipt.receipt_id, receipt]));
+  const judged = new Set(judgments.map((judgment) => judgment.receipt_id).filter(Boolean));
+  const byVerdict = Object.fromEntries(JUDGMENT_VERDICTS.map((verdict) => [verdict, 0]));
+  for (const judgment of judgments) {
+    if (Object.hasOwn(byVerdict, judgment.verdict)) byVerdict[judgment.verdict] += 1;
+  }
+  const pending = routineReceipts.filter((receipt) => receipt.status === 'completed'
+    && receipt.output_ref && !judged.has(receipt.receipt_id)).length;
+  const latest = [...judgments]
+    .sort((left, right) => String(right.decided_at || '').localeCompare(String(left.decided_at || ''))
+      || String(right.judgment_id || '').localeCompare(String(left.judgment_id || '')))
+    .slice(0, LATEST_JUDGMENTS)
+    .map((judgment) => {
+      const receipt = receiptsById.get(judgment.receipt_id) || null;
+      return {
+        judgment_id: judgment.judgment_id || null,
+        receipt_id: judgment.receipt_id || null,
+        run_id: judgment.run_id || null,
+        routine_id: judgment.routine_id || null,
+        system_ref: receipt?.system_ref || null,
+        verdict: judgment.verdict || null,
+        action_intent: judgment.action_intent || 'none',
+        note: notePreview(judgment.note),
+        actor_ref: judgment.actor_ref || null,
+        decided_at: judgment.decided_at || null,
+        receipt_observed: Boolean(receipt),
+      };
+    });
+  return { by_verdict: byVerdict, pending, latest };
+}
+
 export function brainControlCenterModel(root, { sources = [], retrievalHealth = null, systems = [], now = new Date() } = {}) {
   const health = retrievalHealth || retrievalHealthModel(root);
   // Em modo vault os estados da memória saem das notas; sem vault seguem não instrumentados.
@@ -520,7 +578,14 @@ export function brainControlCenterModel(root, { sources = [], retrievalHealth = 
   const judgments = listJsonTree(root, '.cerebro/runtime/judgments');
   const corrections = listJsonTree(root, '.cerebro/runtime/corrections');
   const candidates = listJsonTree(root, '.cerebro/runtime/learning-candidates');
-  const runIds = new Set(records.map((record) => record.run_id));
+  // Julgamento humano acontece sobre execução de Rotina, não sobre Run Record. O
+  // histórico importado do journal só produz recibo de Rotina, então o run do
+  // julgamento tem de ser procurado nos dois lugares antes de virar órfão.
+  const routineReceipts = routineReceiptsForLearning(root);
+  const runIds = new Set([
+    ...records.map((record) => record.run_id),
+    ...routineReceipts.map((receipt) => receipt.run_id),
+  ]);
   const judgmentsByRun = new Map();
   for (const judgment of judgments) {
     if (!judgment.run_id) continue;
@@ -666,6 +731,7 @@ export function brainControlCenterModel(root, { sources = [], retrievalHealth = 
       corrections: corrections.length,
       outcomes: runsWithOutcomes,
       candidates: candidates.length,
+      ...judgmentLearning(root, judgments, routineReceipts),
       promotions: { measured: false, value: null, reason_code: 'promotion-receipts-not-instrumented' },
       reconciliation: { orphan_judgments: orphanJudgments, duplicate_judgments: duplicateJudgments },
     },
