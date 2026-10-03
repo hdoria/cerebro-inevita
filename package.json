@@ -6,7 +6,9 @@
     "build:console": "esbuild console/canvas.js --bundle --minify --format=esm --target=es2022 --outfile=console/canvas.bundle.js",
     "diagnose": "node scripts/compatibility-diagnostic.mjs --root=.",
     "test": "node scripts/validate-product.mjs",
-    "vault:sync": "node scripts/vault-compile.mjs"
+    "vault:compile": "node scripts/vault-compile.mjs",
+    "vault:import": "node scripts/vault-import-history.mjs",
+    "vault:sync": "node scripts/vault-sync.mjs"
   },
   "dependencies": {
     "@antv/g6": "5.1.1",
