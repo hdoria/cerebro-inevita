@@ -3,10 +3,11 @@
 // `npm run vault:sync` — compila as notas tipadas do vault em contratos e, em seguida,
 // importa o histórico de sessões como Run Records v2.
 //
-// É só o encadeamento das duas CLIs, com os mesmos argumentos: o compilador continua em
-// `vault-compile.mjs` e o importador em `vault-import-history.mjs`. Se o compilador sair
-// com erro, o importador ainda roda: Sistema com nota quebrada simplesmente não tem
-// contrato, e o relatório do importador diz quantas sessões ficaram sem contrato.
+// É só o encadeamento das CLIs, com os mesmos argumentos: o compilador continua em
+// `vault-compile.mjs`, o importador de sessões em `vault-import-history.mjs` e o das
+// dailies e weekly reviews em `vault-import-journal.mjs`. Se o compilador sair com erro,
+// os importadores ainda rodam: Sistema ou Rotina com nota quebrada simplesmente não tem
+// contrato, e o relatório de cada importador diz o que ficou sem contrato.
 //
 // uso: node scripts/vault-sync.mjs [--root=<vault>] [--confirm]
 import { spawnSync } from 'node:child_process';
@@ -17,6 +18,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 const STEPS = [
   ['contratos', 'vault-compile.mjs'],
   ['histórico', 'vault-import-history.mjs'],
+  ['journal', 'vault-import-journal.mjs'],
 ];
 
 function main() {

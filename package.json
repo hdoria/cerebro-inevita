@@ -8,6 +8,7 @@
     "test": "node scripts/validate-product.mjs",
     "vault:compile": "node scripts/vault-compile.mjs",
     "vault:import": "node scripts/vault-import-history.mjs",
+    "vault:import-journal": "node scripts/vault-import-journal.mjs",
     "vault:sync": "node scripts/vault-sync.mjs"
   },
   "dependencies": {
