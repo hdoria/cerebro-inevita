@@ -589,7 +589,7 @@ function wsProcedureOrgan(procedure) {
   return `<section class="organ ws-sop-organ"><header class="organ-head">
       <div><h3>Procedimento ligado · ${escapeHtml(procedure.title)}</h3>
       <p>O SOP que a nota do Sistema declara, lido do vault: ${procedure.flow_count} fluxo(s) e ${procedure.step_count} passo(s), com papel e ramo de decisão.</p></div>
-      <button class="action" type="button" data-open-procedure="${escapeHtml(procedure.slug)}">Abrir em Procedimentos →</button>
+      <button class="action" type="button" data-open-procedure="${escapeHtml(procedure.id)}">Abrir em Procedimentos →</button>
     </header>
     ${meta ? `<div class="sop-head-meta ws-sop-meta">${meta}</div>` : ''}
     ${procedure.flows.map(procedureFlow).join('')}
@@ -932,6 +932,12 @@ function brainCount(value) {
   return new Intl.NumberFormat('pt-BR').format(Number(value) || 0);
 }
 
+// Contagem que pode faltar: célula ilegível da tabela do vault chega nula e não pode
+// virar 0 medido na tela.
+function brainMeasure(value) {
+  return value === null || value === undefined ? 'não medido' : brainCount(value);
+}
+
 function brainHouseRow(entry) {
   const changed = entry.last_changed ? `mudou ${fmtDate(entry.last_changed, false)}` : 'sem mudança observada';
   const unit = entry.count === 1 ? entry.unit?.[0] || 'item' : entry.unit?.[1] || 'itens';
@@ -1071,6 +1077,7 @@ function careLabel(item) {
     'runs-limited': 'Runs operaram com alguma limitação explícita',
     'runs-blocked': 'Runs foram bloqueados antes de sustentar resultado',
     'judgment-reconciliation': 'recibos de julgamento precisam de reconciliação com o ledger',
+    'routine-receipt-invalid': 'recibos de execução ilegíveis ficaram fora da leitura',
     'learning-candidates-empty': 'nenhum candidato de aprendizado foi materializado',
   })[item.code] || label(item.code);
 }
@@ -1329,10 +1336,15 @@ function vaultRecallCard(recall) {
   if (!recall?.available) return '';
   const latest = recall.latest;
   const pending = String(recall.status || '').toLocaleLowerCase('pt-BR').startsWith('rascunho');
+  const counted = latest && [latest.hits, latest.partials, latest.misses].some((value) => value !== null);
   return `<section class="vault-recall${latest ? '' : ' is-empty'}">
     <div class="vault-recall-score"><p class="micro">Último recall</p><strong>${latest ? escapeHtml(latest.score || '—') : '—'}</strong><small>${latest ? fmtDate(latest.date, false) : 'nenhuma rodada registrada'}</small></div>
     <div class="vault-recall-body">
-      <h2>${latest ? `${brainCount(latest.hits)} acerto(s), ${brainCount(latest.partials)} parcial(is) e ${brainCount(latest.misses)} erro(s)` : 'A régua existe e ainda não rodou'}</h2>
+      <h2>${latest
+    ? (counted
+      ? `${brainMeasure(latest.hits)} acerto(s), ${brainMeasure(latest.partials)} parcial(is) e ${brainMeasure(latest.misses)} erro(s)`
+      : 'Rodada registrada com contagem não medida')
+    : 'A régua existe e ainda não rodou'}</h2>
       <p>${pending
     ? 'O teste está em rascunho: a weekly não roda a régua até o dono aprovar as perguntas.'
     : 'Dez perguntas respondidas por um chat novo, lendo só o vault. Mede se o cérebro melhorou ou só cresceu.'}</p>
@@ -3120,8 +3132,8 @@ function procedureDetail(procedure) {
       : '<p class="section-help">Esta nota não declara critério de pronto. Sem ele, o fluxo não diz quando parou.</p>'}`;
 }
 
-function procedureItem(procedure, selectedSlug) {
-  return `<button type="button" class="sop-item${procedure.slug === selectedSlug ? ' active' : ''}${procedure.title ? '' : ' is-private'}" data-procedure="${escapeHtml(procedure.slug)}">
+function procedureItem(procedure, selectedId) {
+  return `<button type="button" class="sop-item${procedure.id === selectedId ? ' active' : ''}${procedure.title ? '' : ' is-private'}" data-procedure="${escapeHtml(procedure.id)}">
     <strong>${escapeHtml(procedure.title || 'Procedimento privado')}</strong>
     <small>${procedure.flow_count} fluxo(s) · ${procedure.step_count} passo(s)</small>
   </button>`;
@@ -3129,7 +3141,7 @@ function procedureItem(procedure, selectedSlug) {
 
 // Seleção: a escolha da pessoa vale; sem escolha, o primeiro procedimento legível.
 function selectedProcedure(list) {
-  return list.find((item) => item.slug === state.procedures.selected)
+  return list.find((item) => item.id === state.procedures.selected)
     || list.find((item) => item.flows.length)
     || list[0] || null;
 }
@@ -3152,7 +3164,7 @@ function renderProcedures() {
   return `<div class="section-heading"><div><p class="eyebrow">Como o trabalho acontece</p><h2>Procedimentos</h2></div><p>Passos numerados, papel de quem faz, decisão com ramo e critério de pronto — lidos direto das notas do vault.</p></div>
     <div class="sop-boundary"><span>${model.counts.procedures} procedimento(s) · ${model.counts.flows} fluxo(s) · ${model.counts.steps} passo(s)</span><small>Leitura de ${escapeHtml(model.folder)}/ — o Console nunca escreve na nota.</small></div>
     <div class="sop-layout">
-      <aside class="sop-list" aria-label="Procedimentos do vault">${list.map((item) => procedureItem(item, selected?.slug)).join('')}${toggle}</aside>
+      <aside class="sop-list" aria-label="Procedimentos do vault">${list.map((item) => procedureItem(item, selected?.id)).join('')}${toggle}</aside>
       <div class="sop-detail">${procedureDetail(selected)}</div>
     </div>`;
 }
@@ -3178,6 +3190,8 @@ async function loadProcedures() {
     state.procedures.data = model.available ? model : null;
   } catch (error) {
     state.procedures.error = error.message;
+    // Leitura que falhou não deixa o retrato velho na tela: o erro é o estado agora.
+    state.procedures.data = null;
   } finally {
     state.procedures.loading = false;
     state.procedures.loaded = true;

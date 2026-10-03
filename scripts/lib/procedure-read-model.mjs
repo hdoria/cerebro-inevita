@@ -13,6 +13,7 @@
 //     procedimento, titulado pelo próprio cabeçalho.
 // Procedimento escrito antes da convenção (passos numerados, sem papel e sem
 // ramo) continua sendo lido: vira um fluxo linear.
+import { createHash } from 'node:crypto';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { isAbsolute, join, resolve, sep } from 'node:path';
 import { parseFrontmatter, sectionBullets } from './vault-today.mjs';
@@ -31,6 +32,12 @@ function inside(root, ref) {
   const target = resolve(root, ref);
   const brainRoot = resolve(root);
   return target === brainRoot || target.startsWith(`${brainRoot}${sep}`);
+}
+
+// Identificador que a tela usa para selecionar: estável entre chamadas e sem nada do
+// nome da nota, que para procedimento privado é o próprio título.
+function opaqueId(slug) {
+  return createHash('sha256').update(slug).digest('hex').slice(0, 12);
 }
 
 function markdownFiles(dir) {
@@ -168,9 +175,13 @@ function procedure(root, folder, name, { reveal }) {
   const open = !isPrivate || reveal;
   const flows = flowsOf(text);
   return {
-    slug,
-    // Nota privada entra na lista sem título, sem caminho e sem passos: o caminho
-    // revelaria o título e o passo revelaria o conteúdo. `?reveal=1` manda tudo.
+    // Id opaco e estável: é por ele que a tela seleciona o procedimento, inclusive o
+    // privado, sem precisar do nome do arquivo. Revelar não troca o id.
+    id: opaqueId(slug),
+    slug: open ? slug : null,
+    // Nota privada entra na lista sem título, sem caminho, sem slug e sem passos: o
+    // nome do arquivo e o caminho revelariam o título e o passo revelaria o conteúdo.
+    // `?reveal=1` manda tudo.
     title: open ? heading(text, slug) : null,
     path: open ? join(folder, name) : null,
     private: isPrivate,

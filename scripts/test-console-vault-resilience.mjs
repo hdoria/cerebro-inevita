@@ -66,6 +66,11 @@ try {
   write(join(vaultRoot, '.cerebro', 'runtime', 'receipts', 'routines', `${receipt.receipt_id}.json`), receipt);
   write(join(vaultRoot, '.cerebro', 'runtime', 'receipts', 'routines', 'quebrado.json'), '{quebrado');
   write(join(vaultRoot, '.cerebro', 'contracts', 'experiments', 'quebrado.json'), '{quebrado');
+  // Rotina válida cuja migração está ilegível: o motivo precisa apontar o artefato que
+  // caiu, não o estado da rotina, que está inteiro.
+  const migrated = { ...contract, routine_id: 'rotina-com-migracao-quebrada' };
+  write(join(vaultRoot, '.cerebro', 'contracts', 'routines', `${migrated.routine_id}.json`), migrated);
+  write(join(vaultRoot, '.cerebro', 'runtime', 'migrations', 'routines', `${migrated.routine_id}.json`), '{quebrado');
 
   const vaultConsole = await readConsole(vaultRoot);
   assert.equal(vaultConsole.status, 200, 'arquivo inválido não pode derrubar /api/console');
@@ -79,6 +84,14 @@ try {
   }
   assert.equal(reasons.filter((reason) => reason === 'routine-receipt-invalid').length, 1,
     'o mesmo arquivo ruim não se repete na lista de issues');
+
+  // O motivo nomeia o artefato culpado: migração ilegível não se disfarça de estado inválido.
+  const migrationIssue = vaultConsole.value.issues.find((item) => item.reason_code === 'routine-migration-invalid');
+  assert.ok(migrationIssue, `migração ilegível vira issue própria: ${JSON.stringify(reasons)}`);
+  assert.equal(migrationIssue.ref, '.cerebro/runtime/migrations/routines/rotina-com-migracao-quebrada.json',
+    'a issue aponta o arquivo que não abriu');
+  assert.equal(reasons.includes('routine-state-invalid'), false,
+    'o estado da rotina está inteiro e não pode ser acusado no lugar da migração');
 
   // A falha é isolada por arquivo: o que é válido continua sendo dado.
   assert.deepEqual(vaultConsole.value.routines.map((routine) => routine.routine_id), [contract.routine_id],

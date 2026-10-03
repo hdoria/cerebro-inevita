@@ -153,6 +153,19 @@ Afirmação negativa, output truncado e definição de pronto.
 
 - **2026-10-02 · output truncado responde "não vi"**: usei head e conclui ausência. **Why**: negativa é caro. **How to apply**: diga o que consultou.
 `);
+  // Tema privado: o nome do arquivo é o próprio assunto, então nem ele sai do servidor.
+  write(join(vaultRoot, 'resources', 'learnings', 'cliente-nominal.md'), `---
+type: Reference
+visibility: private
+updated: 2026-10-02
+---
+
+# Lições de um cliente nominal
+
+- **2026-09-30 · primeira**: nada. **Why**: nada. **How to apply**: nada.
+- **2026-09-20 · segunda**: nada. **Why**: nada. **How to apply**: nada.
+- **2026-09-10 · terceira**: nada. **Why**: nada. **How to apply**: nada.
+`);
   write(join(vaultRoot, 'resources', 'learnings', '_novo.md'), '# Rascunho\n\n- **2026-10-03 · nada**: nada.\n');
 
   // MEMORY com seções: só a contagem e o título das regras promovidas.
@@ -189,7 +202,7 @@ A régua do cérebro.
 
 | Data | Acertos | Parciais | Erros | Placar | Perguntas que falharam | O que consertar |
 | --- | --- | --- | --- | --- | --- | --- |
-| 2026-09-27 | 8 | 1 | 1 | 85% | 2 (teto do TSE), 7 (projetos da Idens) | ligar a decisão do teto à nota do projeto |
+| 2026-09-27 | — | — | — | 85% | 2 (teto do TSE), 7 (projetos da Idens) | ligar a decisão do teto à nota do projeto |
 | 2026-10-03 | 10 | 0 | 0 | 100% | nenhuma | gabarito da 2 atualizado |
 
 ## Para que pode servir
@@ -236,10 +249,10 @@ Separa crescer de melhorar.
   const lessons = model.lessons;
   assert.equal(lessons.available, true);
   assert.equal(lessons.folder, 'resources/learnings');
-  assert.deepEqual(lessons.counts, { themes: 3, lessons: 7 }, 'três temas e sete lições, sem o rascunho');
+  assert.deepEqual(lessons.counts, { themes: 4, lessons: 10 }, 'quatro temas e dez lições, sem o rascunho');
   assert.deepEqual(lessons.themes.map((theme) => [theme.slug, theme.count]),
-    [['escrita-e-voz', 4], ['codigo-e-api', 2], ['verificacao', 1]],
-    'o tema com mais lição vem primeiro');
+    [['escrita-e-voz', 4], [null, 3], ['codigo-e-api', 2], ['verificacao', 1]],
+    'o tema com mais lição vem primeiro, e o tema privado entra sem slug');
   const escrita = bySlug(lessons.themes, 'escrita-e-voz');
   assert.equal(escrita.title, 'Lições de escrita e voz');
   assert.equal(escrita.path, 'resources/learnings/escrita-e-voz.md');
@@ -254,6 +267,18 @@ Separa crescer de melhorar.
   const codigo = bySlug(lessons.themes, 'codigo-e-api');
   assert.deepEqual(codigo.cases, [{ slug: 'delta-academy', title: 'delta-academy' }, { slug: 'coding-standards', title: 'coding-standards' }],
     'os casos do tema aparecem juntos, sem repetir');
+
+  // Tema privado: conta, e nada do nome do arquivo sai — nem como slug.
+  const privado = lessons.themes.find((theme) => theme.private);
+  assert.equal(privado.title, null, 'o título do tema privado não sai do servidor');
+  assert.equal(privado.path, null, 'o caminho revelaria o título');
+  assert.equal(privado.slug, null, 'o slug é o nome do arquivo: também revelaria o assunto');
+  assert.match(privado.id, /^[0-9a-f]{12}$/, 'o tema privado entra na lista com id opaco');
+  assert.equal(privado.count, 3, 'a contagem diz que existem lições sem mostrá-las');
+  assert.deepEqual(privado.latest, [], 'as lições do tema privado ficam na nota');
+  assert.deepEqual(privado.cases, []);
+  assert.equal(JSON.stringify(model).includes('cliente-nominal'), false,
+    'o nome do arquivo privado não sai em nenhum campo da resposta');
 
   // Regras promovidas ao MEMORY: contagem e título, nunca o texto.
   const memory = model.memory;
@@ -283,6 +308,7 @@ Separa crescer de melhorar.
   }, 'o último resultado é o da data mais nova');
   assert.equal(recall.previous.date, '2026-09-27', 'a rodada anterior continua disponível para comparar');
   assert.equal(recall.previous.score, '85%');
+  assert.equal(recall.previous.hits, null, 'célula ilegível fica nula: zero medido seria invenção');
 
   // Instalação INEVITA sem a chave `vault`: o aprendizado do vault não existe.
   write(join(inevitaRoot, 'VERSION'), 'fixture\n');
@@ -294,6 +320,15 @@ Separa crescer de melhorar.
   assert.equal(inevitaApi.insights.available, false, 'sem a chave vault, /api/vault-insights é indisponível');
   assert.equal(inevitaApi.insights.decisions, undefined, 'instalação INEVITA não ganha decisões do vault');
   assert.equal(inevitaApi.insights.memory, undefined, 'instalação INEVITA não ganha regras do vault');
+
+  // A tela não transforma célula nula em zero medido: o recall diz "não medido".
+  const app = readFileSync(new URL('../console/app.js', import.meta.url), 'utf8');
+  const recallCard = app.slice(app.indexOf('function vaultRecallCard'), app.indexOf('function renderVaultLearning'));
+  assert.doesNotMatch(recallCard, /brainCount\(latest\.(hits|partials|misses)\)/,
+    'contagem não medida não pode sair como 0 no card do recall');
+  assert.match(recallCard, /brainMeasure\(latest\.hits\)/, 'o card do recall mede pelo valor lido');
+  assert.match(app, /function brainMeasure\(value\) \{[\s\S]*?'não medido'/,
+    'valor nulo precisa aparecer como não medido');
 
   console.log('✓ /api/vault-insights lê decisões por mês, lições por tema, MEMORY e recall sem expor corpo bruto');
 } finally {

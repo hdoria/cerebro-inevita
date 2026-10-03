@@ -18,6 +18,8 @@ import {
   loadRoutineMigration,
   loadRoutineState,
   routineMigrationBlocker,
+  routineMigrationPath,
+  routineStatePath,
 } from './routine-protocol.mjs';
 import {
   layout,
@@ -430,15 +432,34 @@ function healthReason(contract, state, binding, preparation, migration, receipts
     : 'ready-manual-run';
 }
 
+// Leitura etiquetada: quem chama só consegue reportar o motivo certo se o erro disser
+// qual artefato não abriu — estado, migração ou outro.
+function readArtifact(reasonCode, root, path, read) {
+  try {
+    return read();
+  } catch (error) {
+    const tagged = error instanceof Error ? error : new Error(String(error));
+    throw Object.assign(tagged, {
+      reason_code: reasonCode,
+      ref: relative(root, path).replaceAll('\\', '/'),
+    });
+  }
+}
+
 function routineView(root, contract, now, runRecordsById, issues) {
-  const state = loadRoutineState(root, contract.routine_id).state;
+  const statePath = routineStatePath(root, contract.routine_id);
+  const migrationPath = routineMigrationPath(root, contract.routine_id);
+  const state = readArtifact('routine-state-invalid', root, statePath,
+    () => loadRoutineState(root, contract.routine_id).state);
   const binding = bindingView(root, contract);
   const preparation = preparationView(root, contract);
-  const migration = loadRoutineMigration(root, contract.routine_id, { optional: true }).migration;
+  const migration = readArtifact('routine-migration-invalid', root, migrationPath,
+    () => loadRoutineMigration(root, contract.routine_id, { optional: true }).migration);
   const receipts = listRoutineRunReceipts(root, contract.routine_id, { issues })
     .sort((left, right) => Date.parse(right.completed_at) - Date.parse(left.completed_at));
   const latestManual = receipts.find((receipt) => receipt.trigger === 'manual' && receipt.status === 'completed') || null;
-  const blocker = routineMigrationBlocker(root, contract.routine_id);
+  const blocker = readArtifact('routine-migration-invalid', root, migrationPath,
+    () => routineMigrationBlocker(root, contract.routine_id));
   const health = healthReason(contract, state, binding, preparation, migration, receipts);
   return {
     routine_id: contract.routine_id,
@@ -559,11 +580,11 @@ export function buildConsoleReadModel(root, { now = new Date() } = {}) {
   const allSystems = listSystemContracts(root, issues);
   const systems = allSystems.filter((system) => system.product_kind === 'business-system' && system.surface === 'systems');
   const nativeSystems = allSystems.filter((system) => system.product_kind === 'brain-native' || system.surface === 'brain');
-  let vaultDeclared = false;
-  try {
-    const vault = layout(root).vault;
-    vaultDeclared = Boolean(vault) && typeof vault === 'object';
-  } catch { vaultDeclared = false; }
+  // Uma leitura do layout serve as duas perguntas (ativação e título de Área), e layout
+  // ilegível não pode derrubar o modelo no meio da montagem das Áreas.
+  let vaultLayout = null;
+  try { vaultLayout = layout(root).vault ?? null; } catch { vaultLayout = null; }
+  const vaultDeclared = Boolean(vaultLayout) && typeof vaultLayout === 'object';
   const activation = activationState(root, { issues, vaultDeclared });
   const communication = buildCommunicationReadModel(PRODUCT_ROOT);
   let runRecords = [];
@@ -580,8 +601,13 @@ export function buildConsoleReadModel(root, { now = new Date() } = {}) {
     routines = listRoutineContracts(root, { issues }).flatMap((contract) => {
       try {
         return [routineView(root, contract, observedAt, runRecordsById, issues)];
-      } catch {
-        issues.push({ reason_code: 'routine-state-invalid', ref: `routine:${contract.routine_id}` });
+      } catch (error) {
+        // O motivo nomeia o artefato que caiu: estado, migração ou, sem etiqueta, a
+        // própria montagem da visão.
+        issues.push({
+          reason_code: error?.reason_code || 'routine-view-invalid',
+          ref: error?.ref || `routine:${contract.routine_id}`,
+        });
         return [];
       }
     });
@@ -606,7 +632,7 @@ export function buildConsoleReadModel(root, { now = new Date() } = {}) {
   });
   const areas = [...new Set(systems.map((system) => system.operating_area))].sort().map((operatingArea) => ({
     operating_area: operatingArea,
-    name: vaultAreaTitle(root, layout(root).vault, operatingArea) || operatingAreaLabel(operatingArea),
+    name: vaultAreaTitle(root, vaultLayout, operatingArea) || operatingAreaLabel(operatingArea),
     system_refs: systems.filter((system) => system.operating_area === operatingArea).map((system) => system.system_id),
     routine_refs: routines.filter((routine) => businessSystemById.get(routine.system_ref)?.operating_area === operatingArea).map((routine) => routine.routine_id),
   }));

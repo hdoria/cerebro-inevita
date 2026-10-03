@@ -343,6 +343,29 @@ try {
     assert.equal(anatomy.body.control_center.privacy.content_exposed, false);
   });
 
+  // ── 3b. um recibo ilegível não apaga o Aprendizado das outras execuções ────────
+  // O arquivo quebrado é um recibo de Rotina a menos, não o fim da leitura: a pendência,
+  // a reconciliação e o Sistema de cada julgamento continuam saindo dos recibos válidos,
+  // e o arquivo culpado aparece em "o que pede cuidado".
+  write(join(vaultRoot, '.cerebro', 'runtime', 'receipts', 'routines', 'quebrado.json'), '{quebrado');
+  await withConsole(vaultRoot, async ({ get }) => {
+    const anatomy = await get('/api/anatomy');
+    assert.equal(anatomy.status, 200, 'recibo ilegível não derruba /api/anatomy');
+    const learning = anatomy.body.control_center.learning;
+    assert.equal(learning.pending, 1, 'a pendência continua sendo contada pelos recibos legíveis');
+    assert.equal(learning.latest[0].system_ref, first.systemRef,
+      'a linha do Aprendizado continua dizendo de qual Sistema é a execução julgada');
+    assert.deepEqual(learning.reconciliation, { orphan_judgments: 0, duplicate_judgments: 0 },
+      'recibo ilegível não transforma julgamento de execução importada em órfão');
+    const care = anatomy.body.control_center.overview.care;
+    assert.deepEqual(care.find((item) => item.code === 'judgment-reconciliation'), undefined,
+      'sem órfão, a reconciliação não entra no que pede cuidado');
+    assert.deepEqual(care.find((item) => item.code === 'routine-receipt-invalid'),
+      { code: 'routine-receipt-invalid', count: 1 },
+      'o recibo ilegível aparece nomeado em "o que pede cuidado"');
+  });
+  rmSync(join(vaultRoot, '.cerebro', 'runtime', 'receipts', 'routines', 'quebrado.json'));
+
   // ── 4. segundo julgamento: aprovar sem nota e o histórico continua ─────────────
   await withConsole(vaultRoot, async ({ get, post }) => {
     const model = await get('/api/console');

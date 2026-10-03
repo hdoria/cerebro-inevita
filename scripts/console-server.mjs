@@ -515,11 +515,14 @@ const LATEST_JUDGMENTS = 8;
 // A nota do julgamento é privada e pode ser longa; na lista só cabe o começo dela.
 const JUDGMENT_NOTE_PREVIEW = 180;
 
-function routineReceiptsForLearning(root) {
+// Um recibo ilegível é um recibo a menos, não o fim da leitura: o coletor fica com o
+// arquivo culpado (que a tela mostra em "o que pede cuidado") e o aprendizado continua
+// saindo dos recibos válidos.
+function routineReceiptsForLearning(root, issues) {
   try {
-    return listRoutineRunReceipts(root);
+    return listRoutineRunReceipts(root, null, { issues });
   } catch {
-    // Um recibo ilegível não pode apagar o aprendizado das outras execuções.
+    issues.push({ reason_code: 'routine-receipt-invalid', ref: '.cerebro/runtime/receipts/routines' });
     return [];
   }
 }
@@ -581,7 +584,8 @@ export function brainControlCenterModel(root, { sources = [], retrievalHealth = 
   // Julgamento humano acontece sobre execução de Rotina, não sobre Run Record. O
   // histórico importado do journal só produz recibo de Rotina, então o run do
   // julgamento tem de ser procurado nos dois lugares antes de virar órfão.
-  const routineReceipts = routineReceiptsForLearning(root);
+  const receiptIssues = [];
+  const routineReceipts = routineReceiptsForLearning(root, receiptIssues);
   const runIds = new Set([
     ...records.map((record) => record.run_id),
     ...routineReceipts.map((receipt) => receipt.run_id),
@@ -672,6 +676,7 @@ export function brainControlCenterModel(root, { sources = [], retrievalHealth = 
     integrityCounts.limited > 0 ? { code: 'runs-limited', count: integrityCounts.limited } : null,
     integrityCounts.blocked > 0 ? { code: 'runs-blocked', count: integrityCounts.blocked } : null,
     orphanJudgments + duplicateJudgments > 0 ? { code: 'judgment-reconciliation', count: orphanJudgments + duplicateJudgments } : null,
+    receiptIssues.length > 0 ? { code: 'routine-receipt-invalid', count: receiptIssues.length } : null,
     !candidates.length ? { code: 'learning-candidates-empty', count: 0 } : null,
   ].filter(Boolean);
   const skillCatalog = buildSkillReadModel(root, { systems });

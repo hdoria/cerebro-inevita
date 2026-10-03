@@ -196,19 +196,28 @@ visibility: private
     [['passos', 'Passos', 5], ['material-novo', 'Material novo', 2]],
     'seção numerada vira fluxo; Comunicação (só bullets) e Critério de pronto não');
 
-  // (d) privado: sem título, sem caminho e sem passos; a contagem continua honesta.
-  const privada = byslug(model.procedures, 'ficha-de-cliente');
+  // (d) privado: sem título, sem caminho, sem passos e sem slug (o nome do arquivo é o
+  // título); a contagem continua honesta e a seleção na tela usa um id opaco.
+  const privada = model.procedures.find((item) => item.private);
   assert.equal(privada.private, true);
   assert.equal(privada.title, null, 'o título da nota privada não sai do servidor por padrão');
   assert.equal(privada.path, null, 'o caminho revelaria o título, então também fica de fora');
+  assert.equal(privada.slug, null, 'o slug é o nome do arquivo: também revelaria o título');
+  assert.match(privada.id, /^[0-9a-f]{12}$/, 'a nota privada entra na lista com id opaco para selecionar');
+  assert.equal(privada.id.includes('ficha'), false, 'o id não carrega o nome da nota');
   assert.deepEqual(privada.flows, [], 'o passo revelaria o conteúdo da nota privada');
   assert.deepEqual(privada.done, []);
   assert.equal(privada.step_count, 2, 'a contagem diz que existem passos sem mostrá-los');
+  assert.equal(JSON.stringify(model).includes('ficha-de-cliente'), false,
+    'o nome do arquivo privado não sai em nenhum campo da resposta');
+  assert.equal(new Set(model.procedures.map((item) => item.id)).size, 3,
+    'cada procedimento tem um id próprio');
 
-  // Revelar é explícito.
+  // Revelar é explícito, e o id continua o mesmo: a seleção sobrevive ao botão.
   const revealed = byslug(vaultApi.revealed.procedures, 'ficha-de-cliente');
   assert.equal(revealed.title, 'Ficha de um cliente nominal', 'com ?reveal=1 o título privado é enviado');
   assert.equal(revealed.flows[0].steps.length, 2, 'com ?reveal=1 os passos aparecem');
+  assert.equal(revealed.id, privada.id, 'revelar não troca o id do procedimento');
 
   // Instalação INEVITA sem a chave `vault`: a tela não existe.
   write(join(inevitaRoot, 'VERSION'), 'fixture\n');
@@ -218,6 +227,18 @@ visibility: private
   const inevitaApi = await readApi(inevitaRoot, { procedures: '/api/procedures' });
   assert.equal(inevitaApi.procedures.available, false, 'sem a chave vault, /api/procedures é indisponível');
   assert.equal(inevitaApi.procedures.procedures, undefined, 'instalação INEVITA não ganha lista de procedimentos');
+
+  // A tela seleciona pelo id opaco (nunca pelo slug, que não existe para nota privada) e
+  // um erro de leitura limpa o modelo em vez de desenhar o retrato velho.
+  const app = readFileSync(new URL('../console/app.js', import.meta.url), 'utf8');
+  assert.match(app, /data-procedure="\$\{escapeHtml\(procedure\.id\)\}"/,
+    'a lista de procedimentos marca cada item pelo id');
+  assert.match(app, /data-open-procedure="\$\{escapeHtml\(procedure\.id\)\}"/,
+    'abrir o procedimento do Sistema também passa o id');
+  assert.match(app, /list\.find\(\(item\) => item\.id === state\.procedures\.selected\)/,
+    'a seleção procura pelo id, não pelo nome do arquivo');
+  assert.match(app, /state\.procedures\.data = null;/,
+    'erro ao ler procedimentos limpa o modelo em vez de manter o retrato velho');
 
   console.log('✓ /api/procedures lê fluxos, papéis, ramos e critério de pronto sem expor nota privada');
 } finally {

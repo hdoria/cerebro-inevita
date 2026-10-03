@@ -16,6 +16,7 @@
 // Nada de corpo bruto sai daqui: cada campo é uma linha, o wikilink sai sem sintaxe
 // para a tela e o slug fica disponível para ligar. Nota com `visibility: private`
 // entra na contagem sem entregar título nem entrada.
+import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { isAbsolute, join, resolve, sep } from 'node:path';
 import { parseFrontmatter } from './vault-today.mjs';
@@ -55,6 +56,12 @@ function markdownFiles(dir) {
 
 function readText(path) {
   try { return readFileSync(path, 'utf8'); } catch { return null; }
+}
+
+// Identificador estável e sem nada do nome do arquivo, que num tema privado é o próprio
+// assunto. Serve para a tela ligar a linha sem receber o slug.
+function opaqueId(slug) {
+  return createHash('sha256').update(slug).digest('hex').slice(0, 12);
 }
 
 // Texto pronto para a tela: sem sintaxe de wikilink, sem negrito e numa linha.
@@ -190,7 +197,10 @@ function lessonTheme(root, folder, name) {
     })),
   })));
   return {
-    slug,
+    // Tema privado entra na contagem com id opaco e sem slug: o nome do arquivo é o
+    // assunto que o dono mandou esconder.
+    id: opaqueId(slug),
+    slug: isPrivate ? null : slug,
     title: isPrivate ? null : heading(text, slug),
     path: isPrivate ? null : join(folder, name),
     private: isPrivate,
@@ -212,7 +222,10 @@ function lessonsByTheme(root, config) {
   }
   const themes = markdownFiles(resolve(root, declared))
     .map((name) => lessonTheme(root, declared, name))
-    .sort((left, right) => right.count - left.count || left.slug.localeCompare(right.slug));
+    // Empate de contagem continua em ordem de nome; tema privado, que não entrega nome,
+    // se ordena pelo id — determinístico sem revelar nada.
+    .sort((left, right) => right.count - left.count
+      || String(left.slug || left.id).localeCompare(String(right.slug || right.id)));
   return {
     available: true,
     folder: declared,
