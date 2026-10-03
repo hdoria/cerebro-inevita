@@ -5,7 +5,10 @@
 // nomeia o ator e as ferramentas que ele chamou. Este módulo lê as duas coisas e grava,
 // no ledger do layout, um Run Record v2 por sessão classificada:
 //
-//   - o Sistema sai do nome do arquivo e das tags (classificação declarada, sem adivinhar);
+//   - o Sistema sai, primeiro, do nome do arquivo e das tags (a sessão é run de uma skill);
+//   - o que não é run de skill vira run do Sistema da Área em que o trabalho aconteceu
+//     (um Sistema por Área, `sessoes-<area>`), e a Área sai de evidência declarada na nota:
+//     tag, `related_to` e token que casa com projeto da Área — nunca do assunto do texto;
 //   - o `context_snapshot` sai das fontes nomeadas no Log de agentes do mesmo dia,
 //     filtradas pelas fontes que o System Contract daquele Sistema declara;
 //   - sem fonte no log, o Run Record declara a fonte `vault` (a própria nota é a evidência)
@@ -16,10 +19,27 @@
 // Só lê o vault; a única escrita é no ledger de runs (dentro de `.cerebro/runtime/`, fora
 // do Git). Nunca copia conteúdo da sessão: o que entra no recibo é caminho, slug, data e
 // vocabulário fixo deste módulo.
+//
+// **O importador é dono das suas linhas no ledger.** Os recibos daqui não são eventos de
+// execução: são uma projeção do vault, do mesmo jeito que o System Contract é projeção da
+// nota. Projeção precisa ser regenerável, então este módulo reescreve o próprio bloco do
+// ledger e preserva byte a byte toda linha de outra ferramenta, na ordem em que estava — a
+// mesma regra que o compilador de contratos já segue ("remove só os próprios órfãos;
+// contrato criado por outra ferramenta não é tocado", em AGENTS.md).
+//
+// Append também funcionaria para *corrigir* (todo leitor usa `latestRunRecords`, o último
+// registro de cada `run_id`), mas não para *retirar*: Run Record v2 só aceita `started` ou
+// `completed`, não existe status de retratação. Sem reescrever, uma sessão que perdeu a
+// classificação — como as que a regra apertada do `cerebro` desmentiu — ficaria no ledger
+// para sempre como run de um Sistema que ela nunca rodou. Ledger que não se corrige não é
+// auditável, é só antigo.
+//
+// A linha é reconhecida como deste importador por `extensions.import_origin`. Ferramenta
+// que enriquecer um recibo importado precisa trocar esse marcador para assumir a posse.
 import { createHash } from 'node:crypto';
-import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, writeFileSync } from 'node:fs';
 import { dirname, isAbsolute, join, resolve, sep } from 'node:path';
-import { layout, readJson, readRunLedger, validateRunRecord } from './system-protocol.mjs';
+import { layout, readJson, validateRunRecord } from './system-protocol.mjs';
 import { parseFrontmatter } from './vault-today.mjs';
 
 const DATED_NOTE_RE = /^(\d{4}-\d{2}-\d{2})-(.+)\.md$/;
@@ -36,6 +56,8 @@ export const VERIFIED_MARKER = 'legacy-verified';
 const ENTITY_ROLE = 'nota-relacionada';
 // Fonte de recaída: a própria nota de sessão é evidência do vault.
 const VAULT_SOURCE_ID = 'vault';
+// Marcador de posse: linha do ledger com este `extensions.import_origin` é deste módulo.
+export const IMPORT_ORIGIN = 'vault-session-note';
 
 // Padrões de dado pessoal. Nenhum valor do Run Record pode casar com eles: o importador
 // recusa a sessão inteira e reporta, em vez de gravar um recibo com PII.
@@ -72,9 +94,10 @@ const SOURCE_SIGNALS = [
 ];
 
 // Classificação declarada: primeiro padrão que casar manda. O tema é o nome do arquivo
-// sem a data; as tags vêm do frontmatter. Sessão que não casa com nenhum Sistema fica no
-// balde `sessao-livre` e não é importada — Run Record exige `system_id` de um Sistema que
-// existe, e contrato falso não se cria em silêncio.
+// sem a data; as tags vêm do frontmatter. Sessão que não casa com nenhuma skill cai na
+// classificação por Área (abaixo); só quando nem a Área tem evidência é que a sessão fica
+// no balde `sessao-livre` e não é importada — Run Record exige `system_id` de um Sistema
+// que existe, e contrato falso não se cria em silêncio.
 export const FREE_SESSION_BUCKET = 'sessao-livre';
 
 const CLASSIFIERS = [
@@ -87,8 +110,14 @@ const CLASSIFIERS = [
     || tags.includes('daily') || tags.includes('diario')],
   ['weekly-review', 'weekly', ({ tokens, tags }) => tokens.includes('weekly') || tokens.includes('review')
     || tags.includes('weekly') || tags.includes('review') || tags.includes('weekly-review')],
-  ['cerebro', 'cerebro-ou-boot', ({ tokens, tags }) => tokens.includes('cerebro') || tokens.includes('boot')
-    || tokens.includes('bootstrap') || tags.includes('cerebro') || tags.includes('boot')],
+  // O Sistema `cerebro` é o boot da sessão (`/cerebro` → raio-X). A palavra "cerebro" no
+  // nome do arquivo não prova nada: "copia-curso-segundo-cerebro-drive" é cópia de curso e
+  // "trava-segredo-e-skill-cerebro" é obra na skill, não uma invocação dela. Por isso só
+  // conta tag declarada ou um tema inequívoco de boot; "bootstrap" saiu da lista porque
+  // bootstrap do vault é manutenção do cérebro, não abertura de sessão.
+  ['cerebro', 'tag-ou-tema-de-boot', ({ theme, tags }) => tags.includes('cerebro') || tags.includes('boot')
+    || tags.includes('raio-x') || tags.includes('ligar-cerebro')
+    || /^(?:boot|raio-x|ligar-cerebro)(?:-|$)/.test(theme) || /^boot-(?:do-)?cerebro(?:-|$)/.test(theme)],
 ];
 
 function inside(root, ref) {
@@ -160,9 +189,173 @@ export function classifySession({ theme, tags }) {
   const tokens = theme.split('-').filter(Boolean);
   const input = { theme, tokens, tags };
   for (const [systemId, basis, test] of CLASSIFIERS) {
-    if (test(input)) return { system_id: systemId, basis };
+    if (test(input)) return { system_id: systemId, basis, reason: `regra:${basis}` };
   }
-  return { system_id: null, basis: FREE_SESSION_BUCKET };
+  return { system_id: null, basis: FREE_SESSION_BUCKET, reason: null };
+}
+
+// ── Classificação por Área ────────────────────────────────────────────────────────
+// Sessão que não é run de uma skill vira run do Sistema da Área em que o trabalho
+// aconteceu: um Sistema por Área, com `system_id` = `sessoes-<area>`. A Área nunca sai do
+// assunto do texto; ela sai de evidência declarada na nota, em três degraus:
+//
+//   a) `tags` que são slug de uma Área do vault ou um dos aliases abaixo;
+//   b) `related_to`: wikilink para a nota de Área, ou para projeto/empresa cujo
+//      `belongs_to` (ou, na falta dele, `related_to`) chega numa Área;
+//   c) token do H1 ou do nome do arquivo que casa com o slug de um projeto/empresa que
+//      pertence a uma Área.
+//
+// Dentro de cada degrau vale a maioria; empate desce para o degrau seguinte, porque mais
+// evidência é melhor que desistir. Sem vencedor em nenhum degrau, a sessão só vira
+// `hugo-os` quando o trabalho é sobre o próprio cérebro (os tokens de manutenção abaixo);
+// o resto fica sem classificação e é contado no relatório, nunca chutado.
+export const AREA_SYSTEM_PREFIX = 'sessoes-';
+// Área do cérebro sobre si mesmo. É a única Área que a recaída pode escolher, e só com
+// token de manutenção; não é destino de sessão sem evidência.
+export const MAINTENANCE_AREA = 'hugo-os';
+// Vocabulário de manutenção do próprio cérebro: vault, skill, agentes, console, rotina.
+// Serve de alias de tag para a Área do cérebro e de prova na recaída de empate.
+export const MAINTENANCE_TOKENS = ['vault', 'skill', 'skills', 'agents', 'console', 'rotina', 'rotinas'];
+// Aliases de tag → Área. Lista curta de propósito: cada linha é uma tag que a casa usa
+// como sinônimo operacional da Área, não uma adivinhação de tema. `linkedin`, `instagram`
+// e `carrossel` são os canais que a Área Conteúdo declara; `mentoria` e `porto-digital`
+// são os dois nomes da mentoria. Alias cuja Área não existe no vault simplesmente não vota.
+export const AREA_TAG_ALIASES = new Map([
+  ['linkedin', 'conteudo'],
+  ['instagram', 'conteudo'],
+  ['carrossel', 'conteudo'],
+  ['mentoria', 'mentoria-porto-digital'],
+  ['porto-digital', 'mentoria-porto-digital'],
+  ...MAINTENANCE_TOKENS.map((token) => [token, MAINTENANCE_AREA]),
+]);
+// Slug curto casa com qualquer coisa; só slug de projeto com quatro letras ou mais entra
+// no degrau (c).
+const MIN_PROJECT_SLUG = 4;
+
+function wikilinks(value) {
+  return [].concat(value || [])
+    .flatMap((item) => [...String(item).matchAll(/\[\[([^\]|#]+)/g)].map((match) => match[1].trim()))
+    .map((target) => slugify(target.includes('/') ? target.slice(target.lastIndexOf('/') + 1) : target))
+    .filter(Boolean);
+}
+
+// Slugs das notas de Área e índice dos projetos/empresas com os elos que levam a uma Área.
+export function areaIndex(root, config) {
+  const areas = new Set();
+  const notes = new Map();
+  const areasRef = typeof config.areas === 'string' && config.areas ? config.areas : 'areas';
+  if (inside(root, areasRef)) {
+    for (const name of markdownFiles(resolve(root, areasRef))) areas.add(slugify(name.slice(0, -3)));
+  }
+  const refs = [
+    ['project', typeof config.projects === 'string' && config.projects ? config.projects : 'projects'],
+    ['company', domainEntryRef(root, 'empresas') || 'companies'],
+  ];
+  for (const [kind, ref] of refs) {
+    if (!inside(root, ref)) continue;
+    for (const name of markdownFiles(resolve(root, ref))) {
+      const slug = slugify(name.slice(0, -3));
+      if (!slug || areas.has(slug) || notes.has(slug)) continue;
+      const meta = parseFrontmatter(readText(join(resolve(root, ref), name)) || '');
+      notes.set(slug, { kind, belongs: wikilinks(meta.belongs_to), related: wikilinks(meta.related_to) });
+    }
+  }
+  return { areas, notes };
+}
+
+// Áreas a que uma nota de projeto/empresa pertence. `belongs_to` manda; só quando ele não
+// chega a nenhuma Área o `related_to` é consultado. Resolve em cadeia (projeto que pertence
+// a projeto que pertence a Área) e para em ciclo.
+export function resolveNoteAreas(slug, { areas, notes }, seen = new Set()) {
+  if (areas.has(slug)) return [slug];
+  const note = notes.get(slug);
+  if (!note || seen.has(slug)) return [];
+  seen.add(slug);
+  for (const field of ['belongs', 'related']) {
+    const found = [];
+    for (const target of note[field]) {
+      for (const area of resolveNoteAreas(target, { areas, notes }, seen)) {
+        if (!found.includes(area)) found.push(area);
+      }
+    }
+    if (found.length) return found;
+  }
+  return [];
+}
+
+function winner(votes) {
+  const ranked = [...votes.entries()].sort((left, right) => right[1].count - left[1].count
+    || left[0].localeCompare(right[0]));
+  if (!ranked.length) return null;
+  if (ranked.length > 1 && ranked[0][1].count === ranked[1][1].count) return null;
+  return { area: ranked[0][0], reason: ranked[0][1].reason };
+}
+
+// Degrau (a): tags.
+function votesByTag(tags, index) {
+  const votes = new Map();
+  for (const tag of tags) {
+    const area = index.areas.has(tag) ? tag : AREA_TAG_ALIASES.get(tag);
+    if (!area || !index.areas.has(area)) continue;
+    const vote = votes.get(area) || { count: 0, reason: `tag:${tag}` };
+    vote.count += 1;
+    votes.set(area, vote);
+  }
+  return votes;
+}
+
+// Degrau (b): `related_to`.
+function votesByRelated(related, index) {
+  const votes = new Map();
+  for (const target of related) {
+    const resolved = index.areas.has(target) ? [target] : resolveNoteAreas(target, index);
+    const kind = index.areas.has(target) ? 'area' : index.notes.get(target)?.kind;
+    if (!kind) continue;
+    for (const area of resolved) {
+      const code = kind === 'area' ? `related:area:${target}` : `related:${kind}:${target}->${area}`;
+      const vote = votes.get(area) || { count: 0, reason: code };
+      vote.count += 1;
+      votes.set(area, vote);
+    }
+  }
+  return votes;
+}
+
+// Degrau (c): token do nome do arquivo ou do H1 que casa com slug de projeto/empresa.
+function votesByToken(tokens, index) {
+  const votes = new Map();
+  for (const slug of [...index.notes.keys()].sort()) {
+    if (slug.length < MIN_PROJECT_SLUG || !containsTokens(tokens, slug.split('-'))) continue;
+    for (const area of resolveNoteAreas(slug, index)) {
+      const code = `token:${index.notes.get(slug).kind}:${slug}->${area}`;
+      const vote = votes.get(area) || { count: 0, reason: code };
+      vote.count += 1;
+      votes.set(area, vote);
+    }
+  }
+  return votes;
+}
+
+function containsTokens(haystacks, needle) {
+  return haystacks.some((tokens) => tokens.some((_, start) => needle
+    .every((token, offset) => tokens[start + offset] === token)));
+}
+
+export function classifyArea({ tags, related, themeTokens, h1Tokens }, index) {
+  const tokens = [themeTokens, h1Tokens];
+  const tiers = [votesByTag(tags, index), votesByRelated(related, index), votesByToken(tokens, index)];
+  let evidence = false;
+  for (const votes of tiers) {
+    if (votes.size) evidence = true;
+    const chosen = winner(votes);
+    if (chosen) return { area: chosen.area, reason: chosen.reason };
+  }
+  // Recaída: só manutenção do próprio cérebro, e só com token que prove isso.
+  if (index.areas.has(MAINTENANCE_AREA)) {
+    const proof = MAINTENANCE_TOKENS.find((token) => tags.includes(token) || containsTokens(tokens, [token]));
+    if (proof) return { area: MAINTENANCE_AREA, reason: `manutencao:${proof}` };
+  }
+  return { area: null, reason: evidence ? 'empate' : 'sem-evidencia' };
 }
 
 // `run_id` estável, derivado só do caminho da nota: reimportar a mesma sessão devolve o
@@ -177,17 +370,7 @@ export function sessionRunId(sessionRef) {
 }
 
 function entityRefs(meta) {
-  const targets = [].concat(meta.related_to || [])
-    .flatMap((value) => [...String(value).matchAll(/\[\[([^\]|#]+)/g)].map((match) => match[1].trim()));
-  const seen = new Set();
-  const refs = [];
-  for (const target of targets) {
-    const id = slugify(target.includes('/') ? target.slice(target.lastIndexOf('/') + 1) : target);
-    if (!id || seen.has(id)) continue;
-    seen.add(id);
-    refs.push({ role: ENTITY_ROLE, id });
-  }
-  return refs;
+  return [...new Set(wikilinks(meta.related_to))].map((id) => ({ role: ENTITY_ROLE, id }));
 }
 
 // Varredura de PII em todo valor de texto do recibo pronto. Sessão com qualquer casamento
@@ -201,17 +384,22 @@ export function scanPii(value, path = 'run_record') {
   return PII_PATTERNS.filter(([, pattern]) => pattern.test(value)).map(([kind]) => `${path}: ${kind}`);
 }
 
-function sessionsDirectory(root, config) {
-  if (typeof config.sessions === 'string' && config.sessions) return config.sessions;
+// Primeira referência de uma entrada do mapa da empresa (`companyMapDomains`), que é onde
+// o layout declara onde cada tipo de nota mora.
+function domainEntryRef(root, entryId) {
   const domains = layout(root).companyMapDomains;
-  if (Array.isArray(domains)) {
-    for (const domain of domains) {
-      for (const entry of domain?.entries || []) {
-        if (entry?.id === 'sessoes' && typeof entry.refs?.[0] === 'string') return entry.refs[0];
-      }
+  if (!Array.isArray(domains)) return null;
+  for (const domain of domains) {
+    for (const entry of domain?.entries || []) {
+      if (entry?.id === entryId && typeof entry.refs?.[0] === 'string') return entry.refs[0];
     }
   }
-  return join('ai', 'sessions');
+  return null;
+}
+
+function sessionsDirectory(root, config) {
+  if (typeof config.sessions === 'string' && config.sessions) return config.sessions;
+  return domainEntryRef(root, 'sessoes') || join('ai', 'sessions');
 }
 
 function systemContracts(root) {
@@ -324,13 +512,22 @@ function buildRunRecord({ contract, session, detected, dailyRef, verified }) {
     outcomes: [],
     privacy: { content_shared_with_inevita: false },
     extensions: {
-      import_origin: 'vault-session-note',
+      import_origin: IMPORT_ORIGIN,
       verification_state: verified ? VERIFIED_MARKER : UNVERIFIED_MARKER,
       session_ref: session.ref,
       daily_ref: dailyRef || null,
       classified_by: session.classification.basis,
+      classification_reason: session.classification.reason,
     },
   };
+}
+
+// Primeiro `# título` do corpo. Entra só como tokens, para casar com slug de projeto:
+// nenhum pedaço do texto da sessão é copiado para o recibo.
+function headingTokens(text) {
+  const body = (text || '').replace(/^---[\s\S]*?\n---/, '');
+  const match = /^#\s+(.+)$/m.exec(body);
+  return match ? slugify(match[1]).split('-').filter(Boolean) : [];
 }
 
 // Lê as notas de sessão do vault e devolve o plano de importação. `confirm` grava;
@@ -340,8 +537,9 @@ export function importVaultSessionHistory(root, { confirm = false } = {}) {
   if (!config || typeof config !== 'object') {
     return {
       mode: 'no-vault', sessions_ref: null, daily_ref: null, total: 0, per_system: {},
-      free_sessions: [], missing_contract: {}, pii_refused: [], invalid: [],
-      with_gap: 0, verified: 0, already_imported: 0, appended: [], records: [],
+      free_sessions: [], missing_contract: {}, pii_refused: [], invalid: [], reasons: {},
+      with_gap: 0, verified: 0, already_imported: 0, corrected: [], withdrawn: [], reemitted: 0,
+      appended: [], records: [],
     };
   }
   const sessionsRef = sessionsDirectory(root, config);
@@ -351,7 +549,8 @@ export function importVaultSessionHistory(root, { confirm = false } = {}) {
   }
   const contracts = systemContracts(root);
   const logs = agentLogByDay(root, dailyRef);
-  const existing = new Set(readRunLedger(root).map((record) => record.run_id));
+  const index = areaIndex(root, config);
+  const ledger = partitionLedger(root);
 
   const report = {
     mode: 'vault',
@@ -363,9 +562,13 @@ export function importVaultSessionHistory(root, { confirm = false } = {}) {
     missing_contract: {},
     pii_refused: [],
     invalid: [],
+    reasons: {},
     with_gap: 0,
     verified: 0,
     already_imported: 0,
+    corrected: [],
+    withdrawn: [],
+    reemitted: 0,
     appended: [],
     records: [],
   };
@@ -384,10 +587,23 @@ export function importVaultSessionHistory(root, { confirm = false } = {}) {
     const date = DATE_RE.test(String(meta.created || '')) ? String(meta.created) : dated[1];
     const theme = slugify(dated[2]);
     const tags = tagList(meta);
-    const classification = classifySession({ theme, tags });
+    let classification = classifySession({ theme, tags });
     if (!classification.system_id) {
-      report.free_sessions.push(ref);
-      continue;
+      // Não é run de skill: vira run do Sistema da Área, se a nota provar qual é.
+      const area = classifyArea({
+        tags,
+        related: wikilinks(meta.related_to),
+        themeTokens: theme.split('-').filter(Boolean),
+        h1Tokens: headingTokens(text),
+      }, index);
+      report.reasons[area.reason] = (report.reasons[area.reason] || 0) + 1;
+      if (!area.area) {
+        report.free_sessions.push(ref);
+        continue;
+      }
+      classification = { system_id: `${AREA_SYSTEM_PREFIX}${area.area}`, basis: 'area', reason: area.reason };
+    } else {
+      report.reasons[classification.reason] = (report.reasons[classification.reason] || 0) + 1;
     }
     const contract = contracts.get(classification.system_id);
     if (!contract) {
@@ -416,18 +632,68 @@ export function importVaultSessionHistory(root, { confirm = false } = {}) {
     if (record.context_snapshot.gaps.length) report.with_gap += 1;
     if (record.eval.passed === true) report.verified += 1;
     report.records.push(record);
-    if (existing.has(record.run_id)) report.already_imported += 1;
-    else report.appended.push(record);
+    const previous = ledger.owned.get(record.run_id);
+    if (!previous) report.appended.push(record);
+    else if (JSON.stringify(previous) === JSON.stringify(record)) report.already_imported += 1;
+    else if (previous.system_id !== record.system_id) {
+      // Mudança de Sistema é correção de classificação e sai nomeada no relatório; o resto
+      // é só o recibo reemitido com o mesmo `run_id`.
+      report.corrected.push({
+        ref,
+        from: previous.system_id,
+        to: record.system_id,
+        reason: record.extensions.classification_reason,
+      });
+    } else report.reemitted += 1;
   }
 
-  if (confirm && report.appended.length) {
-    // Uma escrita só, em append: rodada interrompida não deixa linha partida no ledger.
-    const path = ledgerFile(root);
-    mkdirSync(dirname(path), { recursive: true });
-    appendFileSync(path, `${report.appended.map((record) => JSON.stringify(record)).join('\n')}\n`, { mode: 0o600 });
-    report.written_to = path;
+  // Órfão do próprio importador: run que ele gravou e que a leitura de hoje não sustenta
+  // mais. Sai do bloco, com o Sistema que ele dizia ter rodado, para o relatório nomear.
+  const current = new Set(report.records.map((record) => record.run_id));
+  for (const [runId, record] of ledger.owned) {
+    if (current.has(runId)) continue;
+    report.withdrawn.push({
+      ref: record.extensions?.session_ref || record.output_refs?.[0] || runId,
+      from: record.system_id,
+    });
+  }
+
+  const lines = [...ledger.kept, ...report.records.map((record) => JSON.stringify(record))];
+  const content = lines.length ? `${lines.join('\n')}\n` : '';
+  report.changed = content !== ledger.content;
+  if (confirm && report.changed) {
+    report.written_to = writeLedger(root, content);
   }
   return report;
+}
+
+// Separa o ledger entre as linhas deste importador (por `extensions.import_origin`) e as
+// das outras ferramentas, que voltam como texto cru para serem preservadas byte a byte.
+function partitionLedger(root) {
+  const path = ledgerFile(root);
+  const content = existsSync(path) ? readFileSync(path, 'utf8') : '';
+  const owned = new Map();
+  const kept = [];
+  for (const line of content.split('\n').filter(Boolean)) {
+    let parsed = null;
+    try { parsed = JSON.parse(line); } catch { parsed = null; }
+    if (parsed?.extensions?.import_origin === IMPORT_ORIGIN && typeof parsed.run_id === 'string') {
+      // Linha repetida do mesmo run: vale a última, como em `latestRunRecords`.
+      owned.set(parsed.run_id, parsed);
+    } else kept.push(line);
+  }
+  return { content, owned, kept };
+}
+
+// Escrita atômica: o ledger novo nasce ao lado e troca de nome, para rodada interrompida
+// nunca deixar o arquivo pela metade.
+function writeLedger(root, content) {
+  const path = ledgerFile(root);
+  mkdirSync(dirname(path), { recursive: true });
+  const temporary = `${path}.${process.pid}.tmp`;
+  writeFileSync(temporary, content, { mode: 0o600 });
+  renameSync(temporary, path);
+  return path;
 }
 
 // Mesmo caminho que `appendRunRecord` usa, sem passar pelo `ensureBrain` das CLIs da

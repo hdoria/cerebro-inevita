@@ -50,6 +50,17 @@ function main() {
   }
   if (!systems.length) console.log('por sistema · nenhuma sessão classificada');
   console.log(`sem classificação · ${report.free_sessions.length} sessão(ões) no balde sessao-livre (não importadas)`);
+  for (const ref of report.free_sessions.slice(0, 5)) console.log(`sem classificação · exemplo · ${ref}`);
+  for (const [reason, count] of Object.entries(report.reasons).sort((left, right) => right[1] - left[1]
+    || left[0].localeCompare(right[0]))) {
+    console.log(`motivo · ${reason} · ${count}`);
+  }
+  for (const correction of report.corrected) {
+    console.log(`corrigida · ${correction.ref} · ${correction.from} → ${correction.to} · ${correction.reason}`);
+  }
+  for (const withdrawal of report.withdrawn) {
+    console.log(`retirada · ${withdrawal.ref} · era run de ${withdrawal.from} e não tem mais classificação`);
+  }
   for (const [systemId, count] of Object.entries(report.missing_contract).sort()) {
     console.log(`sem contrato · ${systemId} · ${count} sessão(ões) classificadas sem System Contract compilado`);
   }
@@ -66,9 +77,13 @@ function main() {
   }
 
   const total = report.records.length;
+  const changes = `${report.corrected.length ? ` · ${report.corrected.length} corrigida(s)` : ''}${
+    report.withdrawn.length ? ` · ${report.withdrawn.length} retirada(s)` : ''}${
+    report.reemitted ? ` · ${report.reemitted} reemitida(s)` : ''}`;
   console.log(confirm
-    ? `${total} run record(s) v2 · ${report.appended.length} gravado(s) · ${report.already_imported} já no ledger${report.written_to ? ` · ${relative(root, report.written_to) || report.written_to}` : ''}`
-    : `simulação: ${total} run record(s) v2 · ${report.appended.length} a gravar · ${report.already_imported} já no ledger. Use --confirm para gravar.`);
+    ? `${total} run record(s) v2 · ${report.appended.length} novo(s)${changes} · ${report.already_imported} já no ledger${report.written_to ? ` · ${relative(root, report.written_to) || report.written_to}` : ''}`
+    : `simulação: ${total} run record(s) v2 · ${report.appended.length} novo(s)${changes} · ${report.already_imported} já no ledger. Use --confirm para gravar.`);
+  if (confirm && !report.changed) console.log('o bloco deste importador no ledger já estava em dia; nada reescrito');
 
   return report.pii_refused.length || report.invalid.length ? 1 : 0;
 }
