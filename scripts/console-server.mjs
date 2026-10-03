@@ -22,6 +22,7 @@ import { latestRunRecords, layout } from './lib/system-protocol.mjs';
 import { vaultToday } from './lib/vault-today.mjs';
 import { isPrivateNote, knowledgeNotes, vaultMemoryLifecycle } from './lib/vault-read-model.mjs';
 import { vaultProcedures } from './lib/procedure-read-model.mjs';
+import { vaultInsights } from './lib/vault-insights.mjs';
 import { saveCanvasLayout } from './lib/canvas-layout-runtime.mjs';
 import {
   buildBrainGraph,
@@ -1525,6 +1526,11 @@ export function createConsoleServer({
       if (request.method === 'GET' && url.pathname === '/api/vault-today') {
         if (!exactEqual(cookies(request)[COOKIE_NAME], sessionToken)) throw new Error('session-required');
         send(response, 200, vaultToday(brainRoot, vaultConfig(brainRoot)));
+        return;
+      }
+      if (request.method === 'GET' && url.pathname === '/api/vault-insights') {
+        if (!exactEqual(cookies(request)[COOKIE_NAME], sessionToken)) throw new Error('session-required');
+        send(response, 200, vaultInsights(brainRoot, vaultConfig(brainRoot)));
         return;
       }
       if (request.method === 'GET' && url.pathname === '/api/procedures') {

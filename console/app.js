@@ -39,6 +39,9 @@ const state = {
     updates: { data: null, loading: false, checking: false, applying: false, error: null },
   },
   brainGraph: null,
+  // Aprendizado lido do vault: decisões por mês, lições por tema, regras promovidas
+  // e recall. Fica `null` fora do modo vault e a aba Aprendizado não muda.
+  vaultInsights: null,
   skills: { origin: 'company', status: 'all', link: 'all', query: '', data: null, loading: false, error: null },
   // Procedimentos (SOPs) do vault. `available` desliga a view inteira fora do modo
   // vault; `reveal` nasce desligado em cada carregamento, como em knowledge.
@@ -1219,11 +1222,108 @@ function renderBrainRecovery(anatomy) {
   </div>`;
 }
 
+/* Aprendizado lido do vault (ticket 14): a linha do tempo de decisões por mês, as
+   lições por tema e o último resultado do teste de recall. Só aparece em modo vault;
+   fora dele a aba Aprendizado continua sendo a da INEVITA. Classe, nunca estilo
+   inline: a CSP do Console bloqueia style=. */
+const MONTH_FMT = new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' });
+
+function vaultMonthLabel(month) {
+  if (!/^\d{4}-\d{2}$/.test(String(month || ''))) return String(month || 'mês');
+  const label = MONTH_FMT.format(new Date(`${month}-01T12:00:00`));
+  return label.charAt(0).toLocaleUpperCase('pt-BR') + label.slice(1);
+}
+
+function vaultNoteChips(refs, prefix) {
+  if (!refs?.length) return '';
+  return `<span class="vault-chips">${prefix ? `<em>${escapeHtml(prefix)}</em>` : ''}${refs
+    .map((ref) => `<code>${escapeHtml(ref.title)}</code>`).join('')}</span>`;
+}
+
+function vaultDecisionEntry(entry) {
+  return `<li class="vault-entry">
+    <span class="vault-entry-date">${fmtDate(entry.date, false)}</span>
+    <div>
+      <p class="vault-entry-claim">${escapeHtml(entry.decision)}</p>
+      ${entry.context ? `<p class="vault-entry-context">${escapeHtml(entry.context)}</p>` : ''}
+      <div class="vault-entry-refs">${vaultNoteChips(entry.notes, 'notas')}${entry.session
+    ? `<span class="vault-chips"><em>sessão</em><code>${escapeHtml(entry.session)}</code></span>` : ''}</div>
+    </div>
+  </li>`;
+}
+
+function vaultDecisionTimeline(decisions) {
+  if (!decisions?.available) return '';
+  const months = decisions.months || [];
+  // Abre o mês mais novo que tem entrada: o mês corrente pode estar vazio e abrir
+  // uma lista vazia não mostra decisão nenhuma.
+  const opened = months.findIndex((month) => month.entries.length);
+  return `<section class="vault-learning-block">
+    <header><div><p class="micro">Linha do tempo</p><h2>Decisões por mês</h2><p>Log de append do vault: a decisão em uma linha, o contexto e os wikilinks da nota afetada e do log de sessão.</p></div><span>${brainCount(decisions.counts.entries)} decisão(ões) · ${brainCount(decisions.counts.months)} mês(es)</span></header>
+    ${months.length ? months.map((month, index) => `<details class="vault-month"${index === opened ? ' open' : ''}>
+      <summary><strong>${escapeHtml(month.title || vaultMonthLabel(month.month))}</strong><span>${brainCount(month.count)} decisão(ões)</span></summary>
+      ${month.entries.length
+    ? `<ol class="vault-entries">${month.entries.map(vaultDecisionEntry).join('')}</ol>`
+    : `<p class="vault-withheld">${month.private ? 'Mês privado: a contagem é honesta, a entrada fica na nota.' : 'Nenhuma entrada no formato do log neste mês.'}</p>`}
+    </details>`).join('') : '<p class="brain-clear-state">Nenhum mês de decisão no vault.</p>'}
+  </section>`;
+}
+
+function vaultLessonTheme(theme) {
+  return `<article class="vault-theme${theme.private ? ' is-private' : ''}">
+    <header><span class="vault-theme-count" aria-label="${theme.count === 1 ? 'uma lição' : `${brainCount(theme.count)} lições`}">${brainCount(theme.count)}</span><div><h3>${escapeHtml(theme.title || 'Tema privado')}</h3><small>${theme.updated ? `atualizado em ${fmtDate(theme.updated, false)}` : theme.count === 1 ? 'uma lição' : `${brainCount(theme.count)} lições`}</small></div></header>
+    ${theme.latest.length
+    ? `<ul class="vault-theme-latest">${theme.latest.map((lesson) => `<li><b>${fmtDate(lesson.date, false)}</b><span>${escapeHtml(lesson.rule)}</span></li>`).join('')}</ul>`
+    : '<p class="vault-withheld">As lições deste tema ficam na nota.</p>'}
+    ${theme.cases?.length ? vaultNoteChips(theme.cases.slice(0, 4), 'casos') : ''}
+  </article>`;
+}
+
+function vaultLessonsByTheme(lessons, memory) {
+  if (!lessons?.available) return '';
+  const themes = lessons.themes || [];
+  return `<section class="vault-learning-block">
+    <header><div><p class="micro">O que o cérebro aprendeu</p><h2>Lições por tema</h2><p>Cada tema é um arquivo do vault, carregado só quando a tarefa é dele. O que se repete em dois contextos sobe para o MEMORY.</p></div><span>${brainCount(lessons.counts.lessons)} lição(ões) · ${brainCount(lessons.counts.themes)} tema(s)</span></header>
+    ${themes.length ? `<div class="vault-theme-grid">${themes.map(vaultLessonTheme).join('')}</div>` : '<p class="brain-clear-state">Nenhum tema de lição no vault.</p>'}
+    ${memory?.available ? `<div class="vault-promoted"><div><strong>${brainCount(memory.count)} regra(s) promovida(s) ao MEMORY</strong><small>Lidas em toda sessão, de ${escapeHtml(memory.path)} — só o título sai do vault.</small></div><ul>${memory.rules.map((rule) => `<li>${escapeHtml(rule)}</li>`).join('')}</ul></div>` : ''}
+  </section>`;
+}
+
+function vaultRecallCard(recall) {
+  if (!recall?.available) return '';
+  const latest = recall.latest;
+  const pending = String(recall.status || '').toLocaleLowerCase('pt-BR').startsWith('rascunho');
+  return `<section class="vault-recall${latest ? '' : ' is-empty'}">
+    <div class="vault-recall-score"><p class="micro">Último recall</p><strong>${latest ? escapeHtml(latest.score || '—') : '—'}</strong><small>${latest ? fmtDate(latest.date, false) : 'nenhuma rodada registrada'}</small></div>
+    <div class="vault-recall-body">
+      <h2>${latest ? `${brainCount(latest.hits)} acerto(s), ${brainCount(latest.partials)} parcial(is) e ${brainCount(latest.misses)} erro(s)` : 'A régua existe e ainda não rodou'}</h2>
+      <p>${pending
+    ? 'O teste está em rascunho: a weekly não roda a régua até o dono aprovar as perguntas.'
+    : 'Dez perguntas respondidas por um chat novo, lendo só o vault. Mede se o cérebro melhorou ou só cresceu.'}</p>
+      <dl>
+        <div><dt>Status</dt><dd>${escapeHtml(recall.status || 'não declarado')}</dd></div>
+        <div><dt>Histórico</dt><dd>${recall.history === 1 ? 'uma rodada' : `${brainCount(recall.history)} rodadas`}${recall.previous ? ` · antes ${escapeHtml(recall.previous.score || '—')}` : ''}</dd></div>
+        <div><dt>Perguntas que falharam</dt><dd>${escapeHtml(latest?.failed || 'nenhuma')}</dd></div>
+      </dl>
+      ${latest?.fix ? `<p class="vault-recall-fix"><b>O que consertar</b>${escapeHtml(latest.fix)}</p>` : ''}
+    </div>
+  </section>`;
+}
+
+function renderVaultLearning(insights) {
+  return `<div class="vault-learning">
+    ${vaultRecallCard(insights.recall)}
+    ${vaultDecisionTimeline(insights.decisions)}
+    ${vaultLessonsByTheme(insights.lessons, insights.memory)}
+  </div>`;
+}
+
 function renderBrainLearning(anatomy) {
   const learning = anatomy.control_center.learning;
   const runs = anatomy.control_center.recovery.runs.filter((run) => run.judgments || run.outcomes || run.correction_linked);
   const issues = learning.reconciliation.orphan_judgments + learning.reconciliation.duplicate_judgments;
   return `<div class="brain-control-view brain-learning-view">
+    ${state.vaultInsights ? renderVaultLearning(state.vaultInsights) : ''}
     <section class="brain-learning-lead">
       <div><p class="micro">Ciclo de aprendizado</p><h2>${learning.candidates ? `${brainCount(learning.candidates)} melhorias aguardam prova.` : 'Ainda não existe melhoria pronta para promoção.'}</h2><p>Julgamento registra confiança. Outcome prova efeito. Só então uma mudança pode voltar ao Sistema.</p></div>
       <ol><li><span>01</span><b>${brainCount(learning.judgments)}</b><small>julgamentos</small></li><li><span>02</span><b>${brainCount(learning.corrections)}</b><small>correções</small></li><li><span>03</span><b>${brainCount(learning.outcomes)}</b><small>Runs com outcome</small></li><li><span>04</span><b>${brainCount(learning.candidates)}</b><small>candidatos</small></li></ol>
@@ -3881,14 +3981,16 @@ async function performAction(action) {
 }
 
 async function loadModel() {
-  const [model, decisions, vaultToday, procedures] = await Promise.all([
+  const [model, decisions, vaultToday, procedures, insights] = await Promise.all([
     getJson('/api/console'),
     getJson('/api/decisions').catch(() => null),
     getJson('/api/vault-today').catch(() => null),
     getJson('/api/procedures').catch(() => null),
+    getJson('/api/vault-insights').catch(() => null),
     loadCases(),
   ]);
   state.vaultToday = vaultToday?.available ? vaultToday : null;
+  state.vaultInsights = insights?.available ? insights : null;
   state.procedures.available = Boolean(procedures?.available);
   state.procedures.data = procedures?.available ? procedures : null;
   state.procedures.loaded = true;
